@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from datetime import datetime, date
+import datetime as dt
 from typing import Optional, List
 
 # --- LifeMode Schemas ---
@@ -33,12 +33,12 @@ class LifeModeResponse(LifeModeBase):
 
 # --- StudyRecord Schemas ---
 class StudyRecordBase(BaseModel):
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[dt.datetime] = None
+    end_time: Optional[dt.datetime] = None
     duration_minutes: int
     category: str = "study"
     description: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[dt.date] = None
 
 class StudyRecordCreate(StudyRecordBase):
     pass
@@ -56,14 +56,14 @@ class FinancialRecordBase(BaseModel):
     category: str
     source: str = "manual"
     description: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[dt.date] = None
 
 class FinancialRecordCreate(FinancialRecordBase):
     pass
 
 class FinancialRecordResponse(FinancialRecordBase):
     id: int
-    created_at: datetime
+    created_at: dt.datetime
 
     class Config:
         from_attributes = True
@@ -86,7 +86,7 @@ class DailyMetricUpdate(BaseModel):
     ai_diary_review: Optional[str] = None
 
 class DailyMetricResponse(DailyMetricBase):
-    date: date
+    date: dt.date
 
     class Config:
         from_attributes = True
@@ -102,9 +102,9 @@ class BrainMemoryCreate(BrainMemoryBase):
 
 class BrainMemoryResponse(BrainMemoryBase):
     id: int
-    created_at: datetime
-    updated_at: datetime
-    last_referenced_at: Optional[datetime] = None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    last_referenced_at: Optional[dt.datetime] = None
 
     class Config:
         from_attributes = True
@@ -128,4 +128,3 @@ class SystemSettings(BaseModel):
     bark_key: Optional[str] = None
     reminder_time: str = "22:00"  # 每天推送时间
     reminder_enabled: bool = True
-

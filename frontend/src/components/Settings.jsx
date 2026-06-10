@@ -159,7 +159,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
         {/* 左半侧：基础设置与通道绑定 */}
         <div className="space-y-4">
           <div className="bg-cyber-bg/40 border border-cyber-blue/10 p-3 rounded space-y-3">
-            <h4 className="text-[10px] font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
+            <h4 className="text-xs font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
               <Sliders className="w-3.5 h-3.5" />
               LIFE ACCELERATOR MODE
             </h4>
@@ -177,7 +177,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                   </option>
                 ))}
               </select>
-              <p className="text-[9px] text-gray-500 mt-1">切换模式将自适应更改自律标准、AI 管家语气及推送阈值</p>
+              <p className="text-xs text-gray-500 mt-1">切换模式将自适应更改自律标准、AI 管家语气及推送阈值</p>
             </div>
             
             <div className="grid grid-cols-2 gap-2">
@@ -188,7 +188,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                   value={luoguUid}
                   onChange={(e) => setLuoguUid(e.target.value)}
                   placeholder="如: 1000"
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none"
+                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none cyber-input-focus"
                 />
               </div>
               <div>
@@ -197,14 +197,14 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                   type="number"
                   value={luoguTotalSolved}
                   onChange={(e) => setLuoguTotalSolved(e.target.value)}
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none"
+                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none cyber-input-focus"
                 />
               </div>
             </div>
           </div>
 
           <div className="bg-cyber-bg/40 border border-cyber-blue/10 p-3 rounded space-y-3">
-            <h4 className="text-[10px] font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
+            <h4 className="text-xs font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
               <Cpu className="w-3.5 h-3.5" />
               INTELLIGENCE & AI API KEY
             </h4>
@@ -215,9 +215,9 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 value={deepseekKey}
                 onChange={(e) => setDeepseekKey(e.target.value)}
                 placeholder="sk-..."
-                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
               />
-              <p className="text-[8px] text-gray-600 mt-1">本配置保存在本地 SQLite 中，仅用于本地 AI 对话和日记点评</p>
+              <p className="text-[11px] text-gray-600 mt-1">本配置保存在本地 SQLite 中，仅用于本地 AI 对话和日记点评</p>
             </div>
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
         {/* 右半侧：推送与提醒管理 */}
         <div className="space-y-4">
           <div className="bg-cyber-bg/40 border border-cyber-blue/10 p-3 rounded space-y-3">
-            <h4 className="text-[10px] font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
+            <h4 className="text-xs font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
               <Bell className="w-3.5 h-3.5" />
               BARK / PUSHDEER PUSH CHANNELS
             </h4>
@@ -282,13 +282,13 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
             <button
               type="button"
               onClick={() => setShowModeModal(true)}
-              className="flex-1 bg-cyber-pink/20 hover:bg-cyber-pink/30 border border-cyber-pink text-cyber-pink py-2 rounded font-orbitron font-bold tracking-widest transition-all"
+              className="flex-1 bg-cyber-pink/20 border border-cyber-pink text-cyber-pink py-2 rounded font-orbitron font-bold tracking-widest transition-all cyber-glow-btn cyber-glow-btn-pink"
             >
               CREATE CUSTOM MODE
             </button>
             <button
               type="submit"
-              className="flex-1 bg-cyber-cyan/20 hover:bg-cyber-cyan/30 border border-cyber-cyan text-cyber-cyan py-2 rounded font-orbitron font-bold tracking-widest transition-all shadow-[0_0_15px_rgba(102,252,241,0.1)]"
+              className="flex-1 bg-cyber-cyan/20 border border-cyber-cyan text-cyber-cyan py-2 rounded font-orbitron font-bold tracking-widest transition-all cyber-glow-btn cyber-glow-btn-cyan"
             >
               SAVE CONFIGURATION
             </button>
@@ -307,12 +307,12 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
             return (
               <div 
                 key={m.id}
-                className="bg-cyber-card/30 border border-cyber-blue/10 p-2.5 rounded font-mono text-[10px] flex flex-col justify-between"
+                className="bg-cyber-card/30 border border-cyber-blue/10 p-2.5 rounded font-mono text-xs flex flex-col justify-between"
               >
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <span className="font-bold text-cyber-text">{m.display_name}</span>
-                    <span className="text-[7px] bg-cyber-blue/10 text-cyber-blue px-1 rounded">
+                    <span className="text-[10px] bg-cyber-blue/10 text-cyber-blue px-1 rounded">
                       {isBuiltin ? "SYSTEM" : "CUSTOM"}
                     </span>
                   </div>
@@ -320,7 +320,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 </div>
                 
                 <div className="flex justify-between items-center border-t border-cyber-blue/10 pt-2 mt-1">
-                  <span className="text-[8px] text-cyber-cyan">
+                  <span className="text-[11px] text-cyber-cyan">
                     🎯 {m.target_study_minutes}m学 | {m.target_exercise_minutes}m运 | {m.target_luogu_solved}题
                   </span>
                   {!isBuiltin && (

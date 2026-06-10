@@ -123,15 +123,22 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-cyber-bg hologram-grid scanlines pb-10">
+      {/* 流光极夜星云背景层 */}
+      <div className="cyber-mesh-bg">
+        <div className="cyber-blob blob-1" />
+        <div className="cyber-blob blob-2" />
+        <div className="cyber-blob blob-3" />
+      </div>
+
       {/* 顶部导航 */}
-      <header className="border-b border-cyber-blue/30 bg-cyber-bg/80 backdrop-blur px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <header className="border-b border-cyber-blue/15 bg-cyber-bg/35 backdrop-blur-md px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
           <Cpu className="w-6 h-6 text-cyber-cyan animate-pulse" />
           <div>
             <h1 className="font-orbitron font-black text-lg text-cyber-cyan tracking-widest cyber-text-glow">
               MOSS-LITE COCKPIT
             </h1>
-            <p className="text-[9px] font-mono text-cyber-blue/70">
+            <p className="text-[11px] font-mono text-cyber-blue/70">
               TACTICAL SELF-DISCIPLINE & COGNITIVE CONTROLLER
             </p>
           </div>
@@ -139,14 +146,14 @@ export default function App() {
 
         {/* 顶部中央提示信息 */}
         {syncStatusMsg && (
-          <div className="text-[10px] font-mono border border-cyber-cyan/30 bg-cyber-cyan/10 px-3 py-1.5 rounded animate-pulse text-cyber-cyan shadow-[0_0_10px_rgba(102,252,241,0.1)]">
+          <div className="text-xs font-mono border border-cyber-cyan/30 bg-cyber-cyan/10 px-3 py-1.5 rounded animate-pulse text-cyber-cyan shadow-[0_0_10px_rgba(102,252,241,0.1)]">
             {syncStatusMsg}
           </div>
         )}
 
         {/* 当前人生状态状态显示 */}
         <div className="flex items-center gap-3">
-          <div className="text-right font-mono text-[10px]">
+          <div className="text-right font-mono text-xs">
             <div className="text-gray-500">CURRENT LIFE MODE</div>
             <div className="text-cyber-cyan font-bold tracking-wider cyber-text-glow uppercase">
               {activeModeObj?.display_name || "N/A"}
@@ -175,7 +182,7 @@ export default function App() {
               
               {/* 核心属性参数舱 */}
               <div className="cyber-panel p-5 rounded-lg cyber-border-glow font-mono text-xs text-cyber-text">
-                <h3 className="font-orbitron font-bold text-cyber-cyan mb-3 border-b border-cyber-blue/20 pb-2 tracking-wider text-[11px] flex items-center gap-1.5">
+                <h3 className="font-orbitron font-bold text-cyber-cyan mb-3 border-b border-cyber-blue/20 pb-2 tracking-wider text-xs flex items-center gap-1.5">
                   <BarChart2 className="w-4 h-4 text-cyber-cyan" />
                   COGNITIVE CAPACITIES (30 DAYS)
                 </h3>
@@ -255,7 +262,7 @@ export default function App() {
       </main>
 
       {/* 底部声明 */}
-      <footer className="mt-12 text-center text-[9px] font-mono text-gray-700">
+      <footer className="mt-12 text-center text-[11px] font-mono text-gray-700">
         <p>MOSS-LITE COCKPIT SYSTEM // ALL LOCAL PROCEDURES STABILIZED // OPERATIONAL ENVIRONMENT: DEEP SPACE 9</p>
       </footer>
     </div>

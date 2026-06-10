@@ -178,7 +178,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan"
+                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
                   required
                 />
               </div>
@@ -187,7 +187,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan"
+                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
                 >
                   {type === "expense"
                     ? expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)
@@ -203,7 +203,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                   type="date"
                   value={billDate}
                   onChange={(e) => setBillDate(e.target.value)}
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none"
+                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none cyber-input-focus"
                   required
                 />
               </div>
@@ -214,14 +214,14 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   placeholder="如: 美团午餐"
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-text outline-none focus:border-cyber-cyan"
+                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-text outline-none focus:border-cyber-cyan cyber-input-focus"
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full bg-cyber-blue/20 hover:bg-cyber-cyan/20 border border-cyber-blue text-cyber-cyan py-2 rounded font-orbitron font-bold tracking-widest transition-all"
+              className="w-full bg-cyber-blue/20 border border-cyber-blue text-cyber-cyan py-2 rounded font-orbitron font-bold tracking-widest transition-all cyber-glow-btn cyber-glow-btn-cyan"
             >
               SAVE MANUAL RECORD
             </button>
@@ -245,7 +245,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
               <div className="flex flex-col items-center py-2">
                 <Upload className="w-6 h-6 text-cyber-cyan/70 mb-1.5" />
                 <span className="font-bold text-cyber-cyan">微信 / 支付宝账单 CSV 导入</span>
-                <span className="text-[9px] text-gray-500 mt-1">拖拽或点击上传 CSV 文件进行智能分类解析</span>
+                <span className="text-xs text-gray-500 mt-1">拖拽或点击上传 CSV 文件进行智能分类解析</span>
               </div>
             )}
           </div>
@@ -253,7 +253,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
 
         {/* 右半边：流水列表 */}
         <div className="flex flex-col h-[270px] border border-cyber-blue/20 bg-cyber-bg/40 p-3 rounded">
-          <div className="text-[10px] font-bold text-cyber-cyan mb-2 border-b border-cyber-blue/20 pb-1.5 tracking-wider">
+          <div className="text-xs font-bold text-cyber-cyan mb-2 border-b border-cyber-blue/20 pb-1.5 tracking-wider">
             RECENT LEDGER STREAM (LATEST 15)
           </div>
           
@@ -262,7 +262,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
               records.slice(0, 15).map((record) => (
                 <div 
                   key={record.id}
-                  className="flex justify-between items-center bg-cyber-card/30 border border-cyber-blue/10 hover:border-cyber-blue/30 p-2 rounded text-[10px]"
+                  className="flex justify-between items-center bg-cyber-card/30 border border-cyber-blue/10 hover:border-cyber-blue/30 p-2 rounded text-xs"
                 >
                   <div className="flex items-center gap-1.5">
                     {record.type === "expense" ? (
@@ -272,7 +272,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                     )}
                     <div className="truncate max-w-[120px] sm:max-w-[150px]">
                       <div className="text-cyber-text font-bold leading-tight">{record.description}</div>
-                      <div className="text-[8px] text-gray-500 leading-tight">
+                      <div className="text-[11px] text-gray-500 leading-tight">
                         {record.date} // <span className="text-cyber-cyan">{record.category}</span>
                       </div>
                     </div>

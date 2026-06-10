@@ -17,31 +17,31 @@ export default function Heatmap({ data, onRefresh, days = 70 }) {
 
     // 梯度划分逻辑
     if (dimension === "combined") {
-      if (val < 30) return "bg-cyber-cyan/20 border-cyber-cyan/30 text-cyber-cyan";
-      if (val < 90) return "bg-cyber-cyan/40 border-cyber-cyan/50 text-cyber-cyan";
-      if (val < 180) return "bg-cyber-cyan/70 border-cyber-cyan/80 text-cyber-cyan";
-      return "bg-cyber-cyan border-white shadow-[0_0_10px_rgba(102,252,241,0.5)]";
+      if (val < 30) return "bg-cyber-cyan/20 border-cyber-cyan/30 text-cyber-cyan shadow-[0_0_4px_rgba(102,252,241,0.1)]";
+      if (val < 90) return "bg-cyber-cyan/40 border-cyber-cyan/50 text-cyber-cyan shadow-[0_0_6px_rgba(102,252,241,0.25)]";
+      if (val < 180) return "bg-cyber-cyan/70 border-cyber-cyan/80 text-cyber-cyan shadow-[0_0_8px_rgba(102,252,241,0.4)]";
+      return "bg-cyber-cyan border-white shadow-[0_0_12px_rgba(102,252,241,0.65)]";
     }
     
     if (dimension === "luogu") {
-      if (val === 1) return "bg-cyber-pink/20 border-cyber-pink/30";
-      if (val === 2) return "bg-cyber-pink/40 border-cyber-pink/50";
-      if (val === 3) return "bg-cyber-pink/70 border-cyber-pink/80";
-      return "bg-cyber-pink border-white shadow-[0_0_10px_rgba(255,0,127,0.5)]";
+      if (val === 1) return "bg-cyber-pink/20 border-cyber-pink/30 shadow-[0_0_4px_rgba(255,0,127,0.1)]";
+      if (val === 2) return "bg-cyber-pink/40 border-cyber-pink/50 shadow-[0_0_6px_rgba(255,0,127,0.25)]";
+      if (val === 3) return "bg-cyber-pink/70 border-cyber-pink/80 shadow-[0_0_8px_rgba(255,0,127,0.4)]";
+      return "bg-cyber-pink border-white shadow-[0_0_12px_rgba(255,0,127,0.65)]";
     }
 
     if (dimension === "study") {
-      if (val < 45) return "bg-purple-600/20 border-purple-500/30";
-      if (val < 90) return "bg-purple-600/40 border-purple-500/50";
-      if (val < 150) return "bg-purple-600/70 border-purple-500/80";
-      return "bg-purple-500 border-white shadow-[0_0_10px_rgba(168,85,247,0.5)]";
+      if (val < 45) return "bg-purple-600/20 border-purple-500/30 shadow-[0_0_4px_rgba(168,85,247,0.1)]";
+      if (val < 90) return "bg-purple-600/40 border-purple-500/50 shadow-[0_0_6px_rgba(168,85,247,0.25)]";
+      if (val < 150) return "bg-purple-600/70 border-purple-500/80 shadow-[0_0_8px_rgba(168,85,247,0.4)]";
+      return "bg-purple-500 border-white shadow-[0_0_12px_rgba(168,85,247,0.65)]";
     }
 
     if (dimension === "exercise") {
-      if (val < 15) return "bg-cyber-green/20 border-cyber-green/30";
-      if (val < 30) return "bg-cyber-green/40 border-cyber-green/50";
-      if (val < 60) return "bg-cyber-green/70 border-cyber-green/80";
-      return "bg-cyber-green border-white shadow-[0_0_10px_rgba(57,255,20,0.5)]";
+      if (val < 15) return "bg-cyber-green/20 border-cyber-green/30 shadow-[0_0_4px_rgba(57,255,20,0.1)]";
+      if (val < 30) return "bg-cyber-green/40 border-cyber-green/50 shadow-[0_0_6px_rgba(57,255,20,0.25)]";
+      if (val < 60) return "bg-cyber-green/70 border-cyber-green/80 shadow-[0_0_8px_rgba(57,255,20,0.4)]";
+      return "bg-cyber-green border-white shadow-[0_0_12px_rgba(57,255,20,0.65)]";
     }
 
     return "bg-gray-800";
@@ -93,7 +93,7 @@ export default function Heatmap({ data, onRefresh, days = 70 }) {
         </div>
         
         {/* 维度选择器 */}
-        <div className="flex flex-wrap gap-1 font-mono text-[9px]">
+        <div className="flex flex-wrap gap-1 font-mono text-xs">
           <button
             onClick={() => setDimension("combined")}
             className={`px-2 py-1 border transition-all ${
@@ -141,7 +141,7 @@ export default function Heatmap({ data, onRefresh, days = 70 }) {
       <div className="relative overflow-x-auto py-2">
         <div className="flex gap-2 min-w-[500px]">
           {/* 左侧星期指示 */}
-          <div className="flex flex-col justify-between text-[8px] font-mono text-gray-600 pr-1 h-[122px] pt-1">
+          <div className="flex flex-col justify-between text-[11px] font-mono text-gray-600 pr-1 h-[122px] pt-1">
             <span>周日</span>
             <span>周二</span>
             <span>周四</span>
@@ -158,7 +158,7 @@ export default function Heatmap({ data, onRefresh, days = 70 }) {
       </div>
 
       {/* 底部色带说明 */}
-      <div className="flex justify-between items-center mt-3 pt-3 border-t border-cyber-blue/10 font-mono text-[9px] text-gray-600">
+      <div className="flex justify-between items-center mt-3 pt-3 border-t border-cyber-blue/10 font-mono text-xs text-gray-600">
         <span className="flex items-center gap-1">
           <HelpCircle className="w-3 h-3 text-gray-600" />
           光格代表当天活跃度：越深越自律
@@ -193,7 +193,7 @@ export default function Heatmap({ data, onRefresh, days = 70 }) {
       {/* 全息悬浮卡片 (Tooltip) */}
       {hoveredCell && (
         <div 
-          className="fixed z-50 pointer-events-none bg-cyber-card/95 border border-cyber-cyan/40 rounded p-3 shadow-2xl font-mono text-[10px] w-48 text-cyber-text"
+          className="fixed z-50 pointer-events-none bg-cyber-card/95 border border-cyber-cyan/40 rounded p-3 shadow-2xl font-mono text-xs w-48 text-cyber-text"
           style={{ 
             left: `${hoveredCell.x + 15}px`, 
             top: `${hoveredCell.y + 15}px` 
@@ -220,7 +220,7 @@ export default function Heatmap({ data, onRefresh, days = 70 }) {
               <span>💰 今日支出:</span>
               <strong className="text-amber-500">￥{hoveredCell.expense}</strong>
             </div>
-            <div className="text-[9px] text-cyber-cyan/50 mt-1">
+            <div className="text-[11px] text-cyber-cyan/50 mt-1">
               {getRatingDesc(hoveredCell.rating)}
             </div>
           </div>

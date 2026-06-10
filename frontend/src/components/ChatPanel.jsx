@@ -121,7 +121,7 @@ export default function ChatPanel({ onStateChange, apiUrl }) {
   };
 
   return (
-    <div className="cyber-panel p-5 rounded-lg cyber-border-glow select-none">
+    <div className="p-5 select-none cyber-flow-border">
       <div className="flex items-center justify-between border-b border-cyber-blue/20 pb-3 mb-4">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-cyber-cyan" />
@@ -149,7 +149,7 @@ export default function ChatPanel({ onStateChange, apiUrl }) {
                 key={idx} 
                 className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
               >
-                <div className="flex items-center gap-1.5 text-[8px] text-gray-500 mb-0.5">
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mb-0.5">
                   <span>
                     {msg.sender === "user" ? "[PILOT_USER]" : "[MOSS-LITE]"}
                   </span>
@@ -173,7 +173,7 @@ export default function ChatPanel({ onStateChange, apiUrl }) {
             
             {isThinking && (
               <div className="flex flex-col items-start">
-                <div className="text-[8px] text-cyber-cyan/70 mb-0.5 animate-pulse">
+                <div className="text-[10px] text-cyber-cyan/70 mb-0.5 animate-pulse">
                   [MOSS-LITE] // THINKING...
                 </div>
                 <div className="p-2 bg-cyber-blue/5 border border-cyber-blue/20 text-cyber-blue rounded flex items-center gap-1.5 animate-pulse">
@@ -193,13 +193,13 @@ export default function ChatPanel({ onStateChange, apiUrl }) {
               value={inputMsg}
               onChange={(e) => setInputMsg(e.target.value)}
               placeholder="发送消息，MOSS将更新实体记忆库..."
-              className="flex-1 bg-cyber-bg border border-cyber-blue/30 rounded px-3 py-1.5 text-cyber-text outline-none focus:border-cyber-cyan"
+              className="flex-1 bg-cyber-bg border border-cyber-blue/30 rounded px-3 py-1.5 text-cyber-text outline-none focus:border-cyber-cyan cyber-input-focus"
               disabled={isThinking}
             />
             <button
               type="submit"
               disabled={isThinking || !inputMsg.trim()}
-              className="bg-cyber-blue/20 hover:bg-cyber-cyan/20 border border-cyber-blue hover:border-cyber-cyan text-cyber-cyan px-3 py-1.5 rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="bg-cyber-blue/20 border border-cyber-blue text-cyber-cyan px-3 py-1.5 rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed cyber-glow-btn cyber-glow-btn-cyan"
             >
               <Send className="w-3.5 h-3.5" />
             </button>
@@ -208,7 +208,7 @@ export default function ChatPanel({ onStateChange, apiUrl }) {
 
         {/* 右侧：记忆碎片面板 */}
         <div className="flex flex-col h-[300px] border border-cyber-blue/20 bg-cyber-bg/40 p-3 rounded">
-          <div className="flex items-center gap-1 text-[10px] font-bold text-cyber-cyan mb-2 border-b border-cyber-blue/20 pb-1.5 tracking-wider">
+          <div className="flex items-center gap-1 text-xs font-bold text-cyber-cyan mb-2 border-b border-cyber-blue/20 pb-1.5 tracking-wider">
             <BrainCircuit className="w-3.5 h-3.5 text-cyber-cyan" />
             <span>MOSS ACTIVE MEMORY CORE</span>
           </div>
@@ -220,7 +220,7 @@ export default function ChatPanel({ onStateChange, apiUrl }) {
                 return (
                   <div 
                     key={mem.id}
-                    className={`p-2 rounded text-[10px] border transition-all ${
+                    className={`p-2 rounded text-xs border transition-all ${
                       isRecentlyUsed 
                         ? "bg-cyber-cyan/15 border-cyber-cyan/40" 
                         : "bg-cyber-card/30 border-cyber-blue/10"
@@ -231,7 +231,7 @@ export default function ChatPanel({ onStateChange, apiUrl }) {
                         <Cpu className="w-3 h-3 text-cyber-cyan/70" />
                         {mem.key_concept}
                         {isRecentlyUsed && (
-                          <span className="text-[7px] bg-cyber-cyan/20 text-cyber-cyan px-1 rounded font-bold animate-pulse">
+                          <span className="text-[10px] bg-cyber-cyan/20 text-cyber-cyan px-1 rounded font-bold animate-pulse">
                             ACTIVE
                           </span>
                         )}
@@ -245,7 +245,7 @@ export default function ChatPanel({ onStateChange, apiUrl }) {
                       </button>
                     </div>
                     <p className="text-gray-400 leading-normal">{mem.content}</p>
-                    <div className="text-[7px] text-gray-600 mt-1 flex justify-between">
+                    <div className="text-[10px] text-gray-600 mt-1 flex justify-between">
                       <span>重要级: {"⭐".repeat(mem.importance_score)}</span>
                       <span>{new Date(mem.created_at).toLocaleDateString()}</span>
                     </div>

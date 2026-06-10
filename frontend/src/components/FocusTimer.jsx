@@ -216,7 +216,7 @@ export default function FocusTimer({ onStateChange, onRecordAdded, apiUrl }) {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 text-[10px] font-mono text-gray-500">
+          <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
             <BookOpen className="w-3.5 h-3.5" />
             <span>当前模式下专注将同步反馈至 MOSS 波形</span>
           </div>
@@ -240,7 +240,7 @@ export default function FocusTimer({ onStateChange, onRecordAdded, apiUrl }) {
                 type="date"
                 value={manualDate}
                 onChange={(e) => setManualDate(e.target.value)}
-                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
                 required
               />
             </div>
@@ -249,7 +249,7 @@ export default function FocusTimer({ onStateChange, onRecordAdded, apiUrl }) {
               <select
                 value={manualCategory}
                 onChange={(e) => setManualCategory(e.target.value)}
-                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
               >
                 <option value="study">📖 学术复习 / 学习</option>
                 <option value="coding">💻 代码开发 / 刷题</option>
@@ -267,7 +267,7 @@ export default function FocusTimer({ onStateChange, onRecordAdded, apiUrl }) {
                 type="time"
                 value={manualStartTime}
                 onChange={(e) => setManualStartTime(e.target.value)}
-                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
               />
             </div>
             <div>
@@ -276,7 +276,7 @@ export default function FocusTimer({ onStateChange, onRecordAdded, apiUrl }) {
                 type="time"
                 value={manualEndTime}
                 onChange={(e) => setManualEndTime(e.target.value)}
-                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
               />
             </div>
             <div>
@@ -287,7 +287,7 @@ export default function FocusTimer({ onStateChange, onRecordAdded, apiUrl }) {
                 disabled={!!(manualStartTime && manualEndTime)}
                 onChange={(e) => setManualDuration(e.target.value)}
                 placeholder="或直接填"
-                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan disabled:bg-gray-800 disabled:text-gray-600 disabled:border-gray-700"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan disabled:bg-gray-800 disabled:text-gray-600 disabled:border-gray-700 cyber-input-focus"
                 min="1"
                 required
               />
@@ -301,13 +301,13 @@ export default function FocusTimer({ onStateChange, onRecordAdded, apiUrl }) {
               value={manualDesc}
               onChange={(e) => setManualDesc(e.target.value)}
               placeholder="例如: 复习高数第三章拉格朗日"
-              className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-text outline-none focus:border-cyber-cyan"
+              className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-text outline-none focus:border-cyber-cyan cyber-input-focus"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-cyber-blue/20 hover:bg-cyber-cyan/20 border border-cyber-blue text-cyber-cyan py-2 rounded font-orbitron font-bold tracking-widest transition-all"
+            className="w-full bg-cyber-blue/20 border border-cyber-blue text-cyber-cyan py-2 rounded font-orbitron font-bold tracking-widest transition-all cyber-glow-btn cyber-glow-btn-cyan"
           >
             LOG FOCUS DATA
           </button>

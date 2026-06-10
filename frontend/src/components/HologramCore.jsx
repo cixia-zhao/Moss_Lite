@@ -143,10 +143,25 @@ export default function HologramCore({ state = "calm" }) {
         ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
       }
       
-      ctx.strokeStyle = `rgba(${primaryColor}, 0.85)`;
       ctx.lineWidth = 2;
-      ctx.shadowBlur = 12;
-      ctx.shadowColor = `rgba(${primaryColor}, 0.8)`;
+      ctx.shadowBlur = 15;
+      
+      const grad = ctx.createLinearGradient(centerX - coreRadius, centerY - coreRadius, centerX + coreRadius, centerY + coreRadius);
+      if (state === "active") {
+        grad.addColorStop(0, "rgba(102, 252, 241, 0.95)"); // Cyan
+        grad.addColorStop(0.5, "rgba(139, 92, 246, 0.95)"); // Purple
+        grad.addColorStop(1, "rgba(255, 0, 127, 0.95)"); // Pink
+        ctx.strokeStyle = grad;
+        ctx.shadowColor = "rgba(139, 92, 246, 0.9)";
+      } else if (state === "glitch") {
+        grad.addColorStop(0, "rgba(255, 0, 127, 0.95)"); // Pink
+        grad.addColorStop(1, "rgba(255, 49, 49, 0.95)"); // Red
+        ctx.strokeStyle = grad;
+        ctx.shadowColor = "rgba(255, 0, 127, 0.9)";
+      } else {
+        ctx.strokeStyle = `rgba(${primaryColor}, 0.85)`;
+        ctx.shadowColor = `rgba(${primaryColor}, 0.8)`;
+      }
       
       // 画核心圆形波纹
       ctx.beginPath();
@@ -187,8 +202,8 @@ export default function HologramCore({ state = "calm" }) {
   }, [state]);
 
   return (
-    <div className="relative flex flex-col items-center justify-center p-4 border border-cyber-blue/20 bg-cyber-card/40 rounded-lg cyber-border-glow">
-      <div className="absolute top-2 left-2 text-[10px] font-mono text-cyber-cyan/50 tracking-wider">
+    <div className="relative flex flex-col items-center justify-center p-4 rounded-lg cyber-flow-border">
+      <div className="absolute top-2 left-2 text-xs font-mono text-cyber-cyan/50 tracking-wider">
         CORE_COCKPIT_SYS // STATUS: {state.toUpperCase()}
       </div>
       <canvas ref={canvasRef} className="w-[240px] h-[240px]" />
