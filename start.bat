@@ -1,7 +1,5 @@
 @echo off
 title MOSS-Lite Cockpit Launcher
-echo ===========================================
-echo MOSS-Lite 控制舱启动器激活中...
-echo ===========================================
+echo Starting MOSS-Lite Cockpit...
 python "%~dp0run.py"
 pause
