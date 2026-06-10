@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cozy Pixel Pet Dashboard - Prototype</title>
+  <!-- 引入复古像素字体与温馨圆润字体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-color: #f6ebd8; /* 温馨米黄 */
+      --border-color: #483b32; /* 复古深褐 */
+      --primary-color: #e5989b; /* 温柔粉红 */
+      --secondary-color: #b5e2fa; /* 清新天蓝 */
+      --success-color: #caffbf; /* 护眼草绿 */
+      --warning-color: #ffd6a5; /* 橙黄 */
+      --card-bg: #fffbf4; /* 卡片淡乳 */
+      --text-color: #483b32;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 20px;
+      line-height: 1.5;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.5rem;
+      color: #b5838d;
+      text-shadow: 2px 2px 0px var(--border-color);
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-weight: 600;
+      color: #6d594b;
+    }
+
+    /* 像素风边框生成器 */
+    .pixel-box {
+      background-color: var(--card-bg);
+      border: 4px solid var(--border-color);
+      box-shadow: 
+        0 4px 0 -2px var(--card-bg), 
+        0 -4px 0 -2px var(--card-bg), 
+        4px 0 0 -2px var(--card-bg), 
+        -4px 0 0 -2px var(--card-bg),
+        0 8px 0 -4px var(--border-color), 
+        0 -8px 0 -4px var(--border-color), 
+        8px 0 0 -4px var(--border-color), 
+        -8px 0 0 -4px var(--border-color),
+        0 8px 16px rgba(72, 59, 50, 0.1);
+      position: relative;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .pixel-btn {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.7rem;
+      padding: 10px 14px;
+      background-color: var(--primary-color);
+      color: white;
+      border: 3px solid var(--border-color);
+      box-shadow: 0 3px 0 var(--border-color);
+      cursor: pointer;
+      image-rendering: pixelated;
+      outline: none;
+      transition: all 0.1s ease;
+      margin: 5px;
+      display: inline-block;
+    }
+
+    .pixel-btn:active {
+      transform: translateY(3px);
+      box-shadow: none;
+    }
+
+    .pixel-btn.blue {
+      background-color: var(--secondary-color);
+      color: var(--text-color);
+    }
+
+    .pixel-btn.green {
+      background-color: var(--success-color);
+      color: var(--text-color);
+    }
+
+    /* 主界面布局 */
+    .grid-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 900px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 宠物房间区域 */
+    .pet-room-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .pet-screen {
+      width: 100%;
+      height: 300px;
+      background-color: #d8e2dc; /* 房间墙壁色 */
+      border: 4px solid var(--border-color);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      padding-bottom: 20px;
+      /* 地板贴图 */
+      background-image: 
+        linear-gradient(rgba(72,59,50,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(72,59,50,0.1) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    /* 房间木地板 */
+    .pet-floor {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background-color: #cdb4db;
+      border-top: 4px solid var(--border-color);
+    }
+
+    /* 看板宠物 */
+    .pet-avatar {
+      width: 64px;
+      height: 64px;
+      background-color: var(--border-color);
+      position: relative;
+      bottom: 20px;
+      z-index: 10;
+      animation: idle-bounce 1.2s infinite alternate ease-in-out;
+      image-rendering: pixelated;
+      border-radius: 8px; /* 临时示意 */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .pet-avatar::after {
+      content: "🐱"; /* 用Emoji替代图片示意像素宠物 */
+      font-size: 40px;
+    }
+
+    /* 宠物读书、睡觉等家具道具 */
+    .room-furniture {
+      position: absolute;
+      bottom: 40px;
+      font-size: 24px;
+      z-index: 5;
+    }
+    .desk { left: 40px; }
+    .bed { right: 40px; }
+
+    @keyframes idle-bounce {
+      0% { transform: translateY(0) scaleY(1); }
+      100% { transform: translateY(-8px) scaleY(0.95); }
+    }
+
+    /* 气泡对话框 */
+    .chat-bubble {
+      width: 100%;
+      background: white;
+      border: 3px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px 16px;
+      position: relative;
+      margin-top: 15px;
+      min-height: 80px;
+    }
+
+    .chat-bubble::before {
+      content: "";
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 0 10px 15px 10px;
+      border-style: solid;
+      border-color: transparent transparent var(--border-color) transparent;
+    }
+
+    .chat-bubble::after {
+      content: "";
+      position: absolute;
+      top: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 0 9px 13px 9px;
+      border-style: solid;
+      border-color: transparent transparent white transparent;
+    }
+
+    .chat-sender {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.6rem;
+      color: #b5838d;
+      margin-bottom: 5px;
+    }
+
+    /* 数据分析面板 */
+    .dashboard-panel h2 {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9rem;
+      margin-bottom: 15px;
+      border-bottom: 3px dashed var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    .mode-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      border: 2px solid var(--border-color);
+      background-color: var(--warning-color);
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+
+    /* 状态进度条 */
+    .stat-row {
+      margin-bottom: 12px;
+    }
+
+    .stat-label {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 0.9rem;
+    }
+
+    .progress-bar-outer {
+      height: 20px;
+      background-color: #eee;
+      border: 2px solid var(--border-color);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar-inner {
+      height: 100%;
+      background-color: var(--primary-color);
+      width: 50%;
+      transition: width 0.3s ease;
+    }
+
+    /* 像素热力图 */
+    .heatmap-container {
+      margin-top: 20px;
+    }
+
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: repeat(15, 1fr);
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .heatmap-cell {
+      aspect-ratio: 1;
+      background-color: #e2e2e2;
+      border: 1px solid rgba(72,59,50,0.1);
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .heatmap-cell:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 120%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--border-color);
+      color: white;
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      z-index: 100;
+    }
+
+    /* 热力图色阶 */
+    .level-0 { background-color: #ebedf0; }
+    .level-1 { background-color: #caffbf; }
+    .level-2 { background-color: #9bf6ff; }
+    .level-3 { background-color: #bdb2ff; }
+    .level-4 { background-color: #ffc6ff; } /* 满载自律 */
+
+    .control-group {
+      margin-top: 15px;
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    /* 底部账单列表 */
+    .bill-list {
+      margin-top: 15px;
+      max-height: 150px;
+      overflow-y: auto;
+      border: 2px solid var(--border-color);
+      padding: 8px;
+      background: #faf8f5;
+    }
+
+    .bill-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #ddd;
+      font-size: 0.85rem;
+    }
+
+    .interactive-section {
+      grid-column: 1 / -1;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>COZY PIXEL PET DASHBOARD</h1>
+    <div class="subtitle">您的专属像素健康与学习管家（设计原型）</div>
+  </header>
+
+  <div class="grid-container">
+
+    <!-- 左侧：宠物与聊天互动 -->
+    <div class="pixel-box pet-room-panel">
+      <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span class="mode-badge" id="currentModeBadge">当前状态：日常自律模式</span>
+        <span style="font-weight: bold; font-size: 0.9rem;">猫咪“小布” 级别: Lv.3</span>
+      </div>
+
+      <div class="pet-screen">
+        <div class="room-furniture desk">🪑📖</div>
+        <div class="room-furniture bed">🛌</div>
+        <div class="pet-floor"></div>
+        <div class="pet-avatar" id="petAvatar"></div>
+      </div>
+
+      <div class="chat-bubble">
+        <div class="chat-sender" id="petName">小布</div>
+        <div id="petDialogue">主人，今天又是元气满满的一天！我们的目标是保持身体健康和学习算法哦。今天你打算学习多少分钟？</div>
+      </div>
+
+      <div class="control-group" style="justify-content: center; width: 100%;">
+        <button class="pixel-btn" onclick="interact('study')">模拟学习</button>
+        <button class="pixel-btn blue" onclick="interact('exercise')">模拟运动</button>
+        <button class="pixel-btn green" onclick="interact('chat')">主动对话</button>
+      </div>
+    </div>
+
+    <!-- 右侧：数据仪表盘 -->
+    <div class="pixel-box dashboard-panel">
+      <h2>日常指标与热力图</h2>
+      
+      <div class="stat-row">
+        <div class="stat-label">
+          <span>今日学习时间</span>
+          <span id="studyVal">120 分钟</span>
+        </div>
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="studyBar" style="width: 60%; background-color: var(--secondary-color);"></div>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-label">
+          <span>今日运动时间</span>
+          <span id="exerciseVal">15 分钟</span>
+        </div>
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="exerciseBar" style="width: 25%; background-color: var(--primary-color);"></div>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-label">
+          <span>体重与BMI状况</span>
+          <span id="weightVal">72 kg (BMI: 22.8)</span>
+        </div>
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="weightBar" style="width: 50%; background-color: var(--success-color);"></div>
+        </div>
+      </div>
+
+      <!-- 热力图区域 -->
+      <div class="heatmap-container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="font-size: 0.9rem; font-weight: 700;">自律活跃度热力图</h3>
+          <span style="font-size: 0.75rem; color: #888;">近15天数据</span>
+        </div>
+        <div class="heatmap-grid" id="heatmapGrid">
+          <!-- JS动态生成 -->
+        </div>
+      </div>
+
+      <!-- 记账区域 -->
+      <div style="margin-top: 20px;">
+        <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px;">记账本 (今日花费: <span id="totalCost">￥68.00</span>)</h3>
+        <div class="bill-list" id="billList">
+          <div class="bill-item">
+            <span>餐饮 (午餐)</span>
+            <strong>￥25.00</strong>
+          </div>
+          <div class="bill-item">
+            <span>学习资料 (算法书)</span>
+            <strong>￥43.00</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部：体验自适应状态切换 -->
+    <div class="pixel-box interactive-section">
+      <h2 style="font-size: 0.9rem;">体验：切换当前人生状态 (体验自适应机制)</h2>
+      <p style="font-size: 0.85rem; margin-bottom: 15px;">不同的状态下，系统对您的自律考核和宠物的反馈也会智能调整：</p>
+      
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
+        <button class="pixel-btn blue" onclick="setMode('finals')">期末备考模式</button>
+        <button class="pixel-btn" onclick="setMode('sprint')">算法竞赛冲刺模式</button>
+        <button class="pixel-btn green" onclick="setMode('cozy')">日常自律模式</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // 渲染热力图
+    const grid = document.getElementById('heatmapGrid');
+    const levels = [1, 2, 0, 4, 3, 2, 1, 0, 3, 4, 1, 2, 3, 0, 2];
+    for (let i = 0; i < 15; i++) {
+      const cell = document.createElement('div');
+      cell.className = `heatmap-cell level-${levels[i]}`;
+      cell.setAttribute('data-tooltip', `Day -${14-i}: 活跃度 ${levels[i]}级`);
+      grid.appendChild(cell);
+    }
+
+    let studyTime = 120;
+    let exerciseTime = 15;
+    let weight = 72;
+    let mode = 'cozy';
+
+    function interact(type) {
+      const dialogue = document.getElementById('petDialogue');
+      const avatar = document.getElementById('petAvatar');
+      
+      if (type === 'study') {
+        studyTime += 30;
+        document.getElementById('studyVal').innerText = studyTime + ' 分钟';
+        document.getElementById('studyBar').style.width = Math.min(studyTime / 2, 100) + '%';
+        dialogue.innerText = '哇！主人又去学习啦！我的脑力值在飙升！看我给你表演一段后空翻！';
+        avatar.style.animation = 'none';
+        setTimeout(() => { avatar.style.animation = 'idle-bounce 1.2s infinite alternate ease-in-out'; }, 50);
+      } else if (type === 'exercise') {
+        exerciseTime += 15;
+        document.getElementById('exerciseVal').innerText = exerciseTime + ' 分钟';
+        document.getElementById('exerciseBar').style.width = Math.min(exerciseTime * 1.5, 100) + '%';
+        dialogue.innerText = '呼哈！跑起来！主人的健康指数上升了，我也在做广播体操呢！';
+      } else if (type === 'chat') {
+        if (mode === 'finals') {
+          dialogue.innerText = '主人，我知道你最近在全力准备期末考试，别太担心算法刷题。专心看课本，累了就摸摸我，加油！';
+        } else if (mode === 'sprint') {
+          dialogue.innerText = '算法竞赛冲刺中！今天洛谷刷题了吗？梦想就在眼前，我们要多做中等和困难题哦！';
+        } else {
+          dialogue.innerText = '主人，记账本里的花费还合理吗？今天吃好睡好，就是最大的幸福！';
+        }
+      }
+    }
+
+    function setMode(newMode) {
+      mode = newMode;
+      const badge = document.getElementById('currentModeBadge');
+      const dialogue = document.getElementById('petDialogue');
+      
+      if (newMode === 'finals') {
+        badge.innerText = '当前状态：期末备考模式';
+        badge.style.backgroundColor = 'var(--secondary-color)';
+        dialogue.innerText = '已切换到【期末备考模式】！这段时间我不会因为你没刷算法题而催你，咱们专心复习期末课程！';
+      } else if (newMode === 'sprint') {
+        badge.innerText = '当前状态：算法竞赛冲刺模式';
+        badge.style.backgroundColor = 'var(--primary-color)';
+        dialogue.innerText = '已开启【算法竞赛冲刺模式】！我们要重点关注洛谷数据啦，每日刷题目标已调高，加油！';
+      } else {
+        badge.innerText = '当前状态：日常自律模式';
+        badge.style.backgroundColor = 'var(--warning-color)';
+        dialogue.innerText = '回到【日常自律模式】。生活需要平衡，让我们保持平稳的学习和健康的运动状态吧。';
+      }
+    }
+  </script>
+</body>
+</html>

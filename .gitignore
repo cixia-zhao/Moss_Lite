@@ -83,3 +83,13 @@ dist/
 # OS metadata files
 .DS_Store
 Thumbs.db
+
+# Local SQLite databases
+database/
+*.db
+test_moss_lite.db
+
+# Compiled static frontend folder
+backend/static/
+
+

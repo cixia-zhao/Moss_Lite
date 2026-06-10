@@ -1,0 +1,198 @@
+import re
+import json
+from datetime import datetime
+from typing import List, Tuple, Dict, Any
+from sqlalchemy.orm import Session
+from openai import OpenAI
+
+from ..models import BrainMemory, DailyMetric, StudyRecord, FinancialRecord
+
+def get_client(api_key: str) -> OpenAI:
+    """初始化 OpenAI 兼容客户端 (默认为 DeepSeek 接口)"""
+    # 允许自定义 API 地址，如果未设置则默认指向 DeepSeek 官方端点
+    return OpenAI(
+        api_key=api_key.strip(),
+        base_url="https://api.deepseek.com/v1"
+    )
+
+def query_relevant_memories(db: Session, message: str) -> List[BrainMemory]:
+    """
+    轻量级关键字匹配检索 (免向量数据库 RAG)。
+    从数据库中查找与用户聊天词汇相关的历史记忆。
+    """
+    memories = db.query(BrainMemory).all()
+    relevant = []
+    
+    # 将输入信息切分为关键词 (英文及中文分词示意)
+    # 对于中文，这里使用简单的字词滑动窗口或正则匹配
+    keywords = re.findall(r"[\u4e00-\u9fa5]{2,}|[a-zA-Z0-9]+", message)
+    
+    for memory in memories:
+        match_score = 0
+        # 匹配 key_concept 或 content
+        for kw in keywords:
+            if kw.lower() in memory.key_concept.lower():
+                match_score += 3  # 概念匹配赋予更高权重
+            if kw.lower() in memory.content.lower():
+                match_score += 1
+                
+        if match_score > 0:
+            relevant.append((memory, match_score))
+            
+    # 按匹配程度和重要性降序排序，取前 3 条
+    relevant.sort(key=lambda x: (x[1], x[0].importance_score), reverse=True)
+    
+    result = []
+    for mem, _ in relevant[:3]:
+        # 更新被检索引用时间
+        mem.last_referenced_at = datetime.now()
+        db.add(mem)
+        result.append(mem)
+        
+    if result:
+        db.commit()
+        
+    return result
+
+def extract_and_save_memories(db: Session, api_key: str, message: str):
+    """
+    使用大模型提取并保存用户提及的重要“心事”、“目标”或“梦想”。
+    格式化输出为 key_concept 和 content，并写入 SQLite。
+    """
+    if not api_key:
+        return
+        
+    client = get_client(api_key)
+    
+    system_prompt = (
+        "你是一个记忆提取专家。请从用户的话中提取重要的事实实体（如主人对未来的规划、梦想、心愿、心事、目标、烦恼等）。\n"
+        "如果用户提到这些事情，请提取并按 JSON 数组格式返回，属性为: \n"
+        "key_concept (记忆的核心概念，如：算法竞赛、高数备考、体重管理)\n"
+        "content (详细记忆内容，如：主人希望能拿到金牌)\n"
+        "importance_score (重要程度，1到5整数)\n"
+        "注意：如果话中不包含这些重要人生状态或心事（例如仅是打招呼、发无意义感慨），请直接返回空数组: []\n"
+        "请务必仅返回 JSON 数据，不需要包含 Markdown 的 ```json 格式包裹。"
+    )
+    
+    try:
+        completion = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"用户输入: \"{message}\""}
+            ],
+            temperature=0.1,
+            max_tokens=300
+        )
+        
+        response_text = completion.choices[0].message.content.strip()
+        # 清除可能带有的 markdown 标记
+        response_text = re.sub(r"```json|```", "", response_text).strip()
+        
+        extracted = json.loads(response_text)
+        for item in extracted:
+            concept = item.get("key_concept")
+            content = item.get("content")
+            score = item.get("importance_score", 3)
+            
+            if concept and content:
+                # 检查是否已有相同概念的记忆，有则更新，无则创建
+                existing = db.query(BrainMemory).filter(BrainMemory.key_concept == concept).first()
+                if existing:
+                    existing.content = content
+                    existing.importance_score = score
+                    existing.updated_at = datetime.now()
+                else:
+                    new_mem = BrainMemory(
+                        key_concept=concept,
+                        content=content,
+                        importance_score=score
+                    )
+                    db.add(new_mem)
+        db.commit()
+    except Exception as e:
+        print(f"提取记忆异常: {e}")
+
+def generate_ai_reply(
+    db: Session, 
+    api_key: str, 
+    user_message: str, 
+    current_mode_name: str,
+    current_mode_prompt: str,
+    today_stats: Dict[str, Any]
+) -> Tuple[str, List[str], str]:
+    """
+    结合今日指标、记忆检索以及模式提示词，生成 MOSS-Lite 智脑回复。
+    """
+    if not api_key:
+        return (
+            "【MOSS-Lite 系统提示】: 未检测到 DeepSeek API Key，AI 对话处于离线状态。您可以在设置中配置 Key 后开启完整智能对话。目前我已记住您的数据记录。",
+            [],
+            "calm"
+        )
+        
+    # 1. 关联记忆检索
+    relevant_memories = query_relevant_memories(db, user_message)
+    memories_text = ""
+    memories_used = []
+    
+    if relevant_memories:
+        memories_text = "【你脑海里关于主人的记忆碎片】:\n"
+        for mem in relevant_memories:
+            memories_text += f"- 关于《{mem.key_concept}》: {mem.content}\n"
+            memories_used.append(mem.key_concept)
+            
+    # 2. 拼接当前系统模式和今日数据
+    stats_text = (
+        f"【主人今日数据指标】:\n"
+        f"- 专注学习时长: {today_stats.get('study_minutes', 0)} 分钟\n"
+        f"- 运动时长: {today_stats.get('exercise_minutes', 0)} 分钟\n"
+        f"- 洛谷今日刷题: {today_stats.get('luogu_solved', 0)} 题\n"
+        f"- 今日财务账单: 支出 ￥{today_stats.get('expense', 0.0):.2f}，收入 ￥{today_stats.get('income', 0.0):.2f}\n"
+        f"- 最新体重状态: {today_stats.get('weight', '未记录')} kg (BMI: {today_stats.get('bmi', 'N/A')})\n"
+    )
+
+    base_system = (
+        "你叫 MOSS-Lite，是主人的赛博自律飞船智脑。你的说话语气应当是冷静、充满逻辑、同时对主人有隐隐的关怀和温暖支持（类似于科幻电影里的高级人工智能，偶尔可以带有一些幽默或科技感术语，比如‘检测到主人’、‘算法舱已就绪’、‘核心温度上升’）。\n"
+        "请结合以下主人的【当前生命模式】、【今日数据】和【历史记忆】来回答主人的提问，力求表现出你真的‘记得并深度了解’他。\n"
+        f"当前主人的模式是: {current_mode_name}\n"
+        f"此模式风格指导: {current_mode_prompt or '无特别指示'}\n\n"
+        f"{stats_text}\n"
+        f"{memories_text}\n"
+        "你的回复应保持在 150 字以内，字里行间保持温暖陪伴感和适度的自律督促。"
+    )
+
+    client = get_client(api_key)
+    try:
+        completion = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": base_system},
+                # 可以选传历史对话，为了精简上下文我们单轮生成，但包含了丰富的数据上下文
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.7,
+            max_tokens=250
+        )
+        
+        reply = completion.choices[0].message.content.strip()
+        
+        # 3. 异步/后台进行记忆的更新与提取
+        extract_and_save_memories(db, api_key, user_message)
+        
+        # 4. 根据回复中的情感色彩或内容自动决定 MOSS-Lite 智脑状态球波形
+        hologram_state = "active"
+        lower_reply = reply.lower()
+        if "警告" in lower_reply or "故障" in lower_reply or "提醒" in lower_reply or "超支" in lower_reply or "警报" in lower_reply:
+            hologram_state = "glitch"
+        elif "休假" in lower_reply or "放松" in lower_reply or "阅读" in lower_reply or "平和" in lower_reply or "晚安" in lower_reply:
+            hologram_state = "calm"
+            
+        return reply, memories_used, hologram_state
+        
+    except Exception as e:
+        return (
+            f"【MOSS-Lite 系统异常】: 与 DeepSeek 通讯时发生错误 ({str(e)})。建议检查设置中的 API 地址及 Key 配置是否正确。",
+            [],
+            "glitch"
+        )
