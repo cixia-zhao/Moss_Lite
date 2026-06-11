@@ -7,6 +7,7 @@ import Heatmap from "./components/Heatmap";
 import Ledger from "./components/Ledger";
 import ChatPanel from "./components/ChatPanel";
 import Settings from "./components/Settings";
+import StatisticsPanel from "./components/StatisticsPanel";
 
 // 根据开发环境动态获取 API 端口地址
 const API_URL = import.meta.env.DEV ? "http://localhost:8000" : "";
@@ -116,7 +117,7 @@ export default function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-cyber-bg font-mono text-cyber-cyan scanlines">
         <div className="w-12 h-12 border-4 border-cyber-cyan border-t-transparent rounded-full animate-spin mb-4" />
-        <span className="animate-pulse tracking-widest text-sm">INITIALIZING MOSS-LITE COCKPIT SYSTEM...</span>
+        <span className="animate-pulse tracking-widest text-sm">INITIALIZING MOSS-LITE SYSTEM...</span>
       </div>
     );
   }
@@ -136,11 +137,8 @@ export default function App() {
           <Cpu className="w-6 h-6 text-cyber-cyan animate-pulse" />
           <div>
             <h1 className="font-orbitron font-black text-lg text-cyber-cyan tracking-widest cyber-text-glow">
-              MOSS-LITE COCKPIT
+              MOSS-Lite
             </h1>
-            <p className="text-[11px] font-mono text-cyber-blue/70">
-              TACTICAL SELF-DISCIPLINE & COGNITIVE CONTROLLER
-            </p>
           </div>
         </div>
 
@@ -230,8 +228,15 @@ export default function App() {
           {/* 右侧两栏：热力图、计时器、账单和设置 */}
           <div className="xl:col-span-2 space-y-6">
             
-            {/* 多维度自律热力图 */}
-            <Heatmap data={heatmapData} onRefresh={fetchDashboardData} />
+            {/* 热力图与统计数据排版 */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2">
+                <Heatmap data={heatmapData} onRefresh={fetchDashboardData} apiUrl={API_URL} />
+              </div>
+              <div className="xl:col-span-1">
+                <StatisticsPanel stats={stats} />
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 专注计时面板 */}
@@ -263,7 +268,7 @@ export default function App() {
 
       {/* 底部声明 */}
       <footer className="mt-12 text-center text-[11px] font-mono text-gray-700">
-        <p>MOSS-LITE COCKPIT SYSTEM // ALL LOCAL PROCEDURES STABILIZED // OPERATIONAL ENVIRONMENT: DEEP SPACE 9</p>
+        <p>MOSS-LITE // ALL LOCAL PROCEDURES STABILIZED // OPERATIONAL ENVIRONMENT: DEEP SPACE 9</p>
       </footer>
     </div>
   );

@@ -5,11 +5,12 @@ from typing import List, Optional
 from sqlalchemy import func
 
 from ..db import get_db
-from ..models import StudyRecord, FinancialRecord, DailyMetric, LifeMode, SystemSetting
+from ..models import StudyRecord, FinancialRecord, DailyMetric, LifeMode, SystemSetting, FutureEvent
 from ..schemas import (
     StudyRecordCreate, StudyRecordResponse,
     FinancialRecordCreate, FinancialRecordResponse,
-    DailyMetricResponse, DailyMetricUpdate
+    DailyMetricResponse, DailyMetricUpdate,
+    FutureEventCreate, FutureEventResponse
 )
 
 router = APIRouter()
@@ -129,45 +130,57 @@ def update_daily_metric(target_date: date, payload: DailyMetricUpdate, db: Sessi
 
 @router.get("/records/stats")
 def get_stats(db: Session = Depends(get_db)):
-    """获取整体自律统计情况"""
-    # 统计过去 30 天的数据
+    """获取整体自律统计情况，包含不同周期维度的分类解析"""
     today = date.today()
     start_30 = today - timedelta(days=30)
     
-    # 1. 专注总时长
-    total_study = db.query(func.sum(StudyRecord.duration_minutes)).filter(
-        StudyRecord.date >= start_30,
-        StudyRecord.category != "exercise"
-    ).scalar() or 0
+    # 基础 30 天汇总 (兼容原代码)
+    total_study = db.query(func.sum(StudyRecord.duration_minutes)).filter(StudyRecord.date >= start_30, StudyRecord.category != "exercise").scalar() or 0
+    total_exercise = db.query(func.sum(StudyRecord.duration_minutes)).filter(StudyRecord.date >= start_30, StudyRecord.category == "exercise").scalar() or 0
+    income_30 = db.query(func.sum(FinancialRecord.amount)).filter(FinancialRecord.date >= start_30, FinancialRecord.type == "income").scalar() or 0.0
+    expense_30 = db.query(func.sum(FinancialRecord.amount)).filter(FinancialRecord.date >= start_30, FinancialRecord.type == "expense").scalar() or 0.0
+    total_luogu = db.query(func.sum(DailyMetric.luogu_solved_count)).filter(DailyMetric.date >= start_30).scalar() or 0
     
-    # 2. 运动总时长
-    total_exercise = db.query(func.sum(StudyRecord.duration_minutes)).filter(
-        StudyRecord.date >= start_30,
-        StudyRecord.category == "exercise"
-    ).scalar() or 0
+    # 获取所有的专注记录用于构建高级聚合面板
+    all_study_records = db.query(StudyRecord).all()
     
-    # 3. 财务总计
-    income_30 = db.query(func.sum(FinancialRecord.amount)).filter(
-        FinancialRecord.date >= start_30,
-        FinancialRecord.type == "income"
-    ).scalar() or 0.0
+    # 定义时间维度的界限
+    start_week = today - timedelta(days=today.weekday())
+    start_month = today.replace(day=1)
+    start_year = today.replace(month=1, day=1)
     
-    expense_30 = db.query(func.sum(FinancialRecord.amount)).filter(
-        FinancialRecord.date >= start_30,
-        FinancialRecord.type == "expense"
-    ).scalar() or 0.0
+    stats_data = {
+        "daily": {},
+        "weekly": {},
+        "monthly": {},
+        "yearly": {},
+        "total": {}
+    }
     
-    # 4. 洛谷总刷题数
-    total_luogu = db.query(func.sum(DailyMetric.luogu_solved_count)).filter(
-        DailyMetric.date >= start_30
-    ).scalar() or 0
-    
+    for r in all_study_records:
+        cat = r.category or "study"
+        # Total
+        stats_data["total"][cat] = stats_data["total"].get(cat, 0) + r.duration_minutes
+        # Daily
+        if r.date == today:
+            stats_data["daily"][cat] = stats_data["daily"].get(cat, 0) + r.duration_minutes
+        # Weekly
+        if r.date >= start_week:
+            stats_data["weekly"][cat] = stats_data["weekly"].get(cat, 0) + r.duration_minutes
+        # Monthly
+        if r.date >= start_month:
+            stats_data["monthly"][cat] = stats_data["monthly"].get(cat, 0) + r.duration_minutes
+        # Yearly
+        if r.date >= start_year:
+            stats_data["yearly"][cat] = stats_data["yearly"].get(cat, 0) + r.duration_minutes
+
     return {
         "study_30days": total_study,
         "exercise_30days": total_exercise,
         "income_30days": round(income_30, 2),
         "expense_30days": round(expense_30, 2),
-        "luogu_30days": total_luogu
+        "luogu_30days": total_luogu,
+        "advanced_stats": stats_data
     }
 
 @router.get("/records/heatmap")
@@ -200,7 +213,20 @@ def get_heatmap_data(days: int = Query(60, ge=15, le=365), db: Session = Depends
             
     metric_map = {m.date: m for m in daily_metrics}
     
-    # 拼装结果数组
+    # 获取未来的占位和事件
+    future_events_db = db.query(FutureEvent).filter(FutureEvent.date > today).all()
+    events_map = {}
+    max_future_date = today
+    for ev in future_events_db:
+        if ev.date not in events_map:
+            events_map[ev.date] = []
+        events_map[ev.date].append({"id": ev.id, "title": ev.title, "description": ev.description})
+        if ev.date > max_future_date:
+            max_future_date = ev.date
+            
+    end_date = max_future_date
+        
+    # 拼装结果数组 (过去与今天)
     points = []
     current = start_date
     while current <= today:
@@ -212,21 +238,60 @@ def get_heatmap_data(days: int = Query(60, ge=15, le=365), db: Session = Depends
         rating = metric.overall_rating if metric else "B"
         
         # 计算综合活跃得分 (用于热力图原始深浅度表示)
-        # 1 分钟学习=1分，1分钟运动=2分，1道洛谷=10分
         combined_score = study_min + (exercise_min * 2) + (luogu_solved * 10)
         
         points.append({
             "date": current.isoformat(),
+            "is_future": False,
             "study_minutes": study_min,
             "exercise_minutes": exercise_min,
             "luogu_solved": luogu_solved,
             "expense": round(expense_val, 2),
             "rating": rating,
-            "combined_score": combined_score
+            "combined_score": combined_score,
+            "events": events_map.get(current, [])
+        })
+        current += timedelta(days=1)
+        
+    # 拼装未来预测天数
+    current = today + timedelta(days=1)
+    while current <= end_date:
+        points.append({
+            "date": current.isoformat(),
+            "is_future": True,
+            "study_minutes": 0,
+            "exercise_minutes": 0,
+            "luogu_solved": 0,
+            "expense": 0.0,
+            "rating": "N/A",
+            "combined_score": 0,
+            "events": events_map.get(current, [])
         })
         current += timedelta(days=1)
         
     return points
+
+# --- 未来事件 CRUD ---
+@router.get("/records/future_events", response_model=List[FutureEventResponse])
+def get_future_events(db: Session = Depends(get_db)):
+    return db.query(FutureEvent).filter(FutureEvent.date >= date.today()).order_by(FutureEvent.date.asc()).all()
+
+@router.post("/records/future_events", response_model=FutureEventResponse)
+def create_future_event(payload: FutureEventCreate, db: Session = Depends(get_db)):
+    db_record = FutureEvent(**payload.model_dump())
+    db.add(db_record)
+    db.commit()
+    db.refresh(db_record)
+    return db_record
+
+@router.delete("/records/future_events/{event_id}")
+def delete_future_event(event_id: int, db: Session = Depends(get_db)):
+    record = db.query(FutureEvent).filter(FutureEvent.id == event_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="事件不存在")
+    db.delete(record)
+    db.commit()
+    return {"detail": "事件已删除"}
 
 # --- 辅助评级函数 ---
 

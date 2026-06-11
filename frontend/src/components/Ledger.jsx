@@ -124,7 +124,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
         </h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 font-mono text-xs">
+      <div className="grid grid-cols-1 gap-5 font-mono text-xs">
         
         {/* 左半边：记账录入与CSV上传 */}
         <div className="space-y-4">
@@ -203,7 +203,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                   type="date"
                   value={billDate}
                   onChange={(e) => setBillDate(e.target.value)}
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none cyber-input-focus"
+                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded pl-2 pr-1 py-1.5 text-cyber-cyan outline-none cyber-input-focus"
                   required
                 />
               </div>
@@ -264,21 +264,21 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                   key={record.id}
                   className="flex justify-between items-center bg-cyber-card/30 border border-cyber-blue/10 hover:border-cyber-blue/30 p-2 rounded text-xs"
                 >
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
                     {record.type === "expense" ? (
                       <ArrowDownRight className="w-3.5 h-3.5 text-cyber-pink flex-shrink-0" />
                     ) : (
                       <ArrowUpRight className="w-3.5 h-3.5 text-cyber-green flex-shrink-0" />
                     )}
-                    <div className="truncate max-w-[120px] sm:max-w-[150px]">
-                      <div className="text-cyber-text font-bold leading-tight">{record.description}</div>
-                      <div className="text-[11px] text-gray-500 leading-tight">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-cyber-text font-bold leading-tight truncate">{record.description}</div>
+                      <div className="text-[11px] text-gray-500 leading-tight truncate">
                         {record.date} // <span className="text-cyber-cyan">{record.category}</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     <span className={`font-bold ${record.type === "expense" ? "text-cyber-pink" : "text-cyber-green"}`}>
                       {record.type === "expense" ? "-" : "+"}￥{record.amount.toFixed(2)}
                     </span>

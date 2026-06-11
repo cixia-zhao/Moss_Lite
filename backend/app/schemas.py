@@ -128,3 +128,19 @@ class SystemSettings(BaseModel):
     bark_key: Optional[str] = None
     reminder_time: str = "22:00"  # 每天推送时间
     reminder_enabled: bool = True
+
+# --- FutureEvent Schemas ---
+class FutureEventBase(BaseModel):
+    date: dt.date
+    title: str = Field(..., max_length=100)
+    description: Optional[str] = None
+
+class FutureEventCreate(FutureEventBase):
+    pass
+
+class FutureEventResponse(FutureEventBase):
+    id: int
+    created_at: dt.datetime
+
+    class Config:
+        from_attributes = True

@@ -27,7 +27,7 @@ def print_banner(local_ip):
 ██║ ╚═╝ ██║╚██████╔╝███████║███████║██╗███████╗██║   ██║   ███████╗
 ╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝╚══════╝╚═╝   ╚═╝   ╚══════╝
 ======================================================================
-MOSS-Lite 赛博自律控制舱正启动就绪...
+MOSS-Lite 正启动就绪...
 ----------------------------------------------------------------------
 [本机电脑访问地址] : http://localhost:8000
 [局域网手机访问地址] : http://{local_ip}:8000
@@ -46,7 +46,11 @@ def run():
     subprocess.run([sys.executable, "-m", "pip", "install", "-r", requirements_path], check=True)
 
     print("[MOSS-Lite] 2. 开始校验并安装 React 前端依赖包...")
-    subprocess.run("npm install", shell=True, cwd=frontend_dir, check=True)
+    if not os.path.exists(os.path.join(frontend_dir, "node_modules")):
+        print("[MOSS-Lite] node_modules 目录不存在，正执行安装...")
+        subprocess.run("npm install", shell=True, cwd=frontend_dir, check=True)
+    else:
+        print("[MOSS-Lite] 检测到 node_modules 目录已存在，跳过 npm install 步骤以极速启动。")
 
     print("[MOSS-Lite] 3. 开始编译 React 前端静态资源...")
     subprocess.run("npm run build", shell=True, cwd=frontend_dir, check=True)

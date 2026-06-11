@@ -74,3 +74,12 @@ class SystemSetting(Base):
     reminder_time = Column(String(10), default="22:00")                # 每日推送提醒时间
     reminder_enabled = Column(Boolean, default=True)                   # 是否开启推送
 
+class FutureEvent(Base):
+    __tablename__ = "future_events"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False, index=True)                    # 目标未来日期
+    title = Column(String(100), nullable=False)                        # 事件标题 (如 六级考试)
+    description = Column(Text, nullable=True)                          # 事件详情目标或备注
+    created_at = Column(DateTime, default=datetime.now)                # 创建时间
+

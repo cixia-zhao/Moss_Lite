@@ -282,13 +282,13 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
             <button
               type="button"
               onClick={() => setShowModeModal(true)}
-              className="flex-1 bg-cyber-pink/20 border border-cyber-pink text-cyber-pink py-2 rounded font-orbitron font-bold tracking-widest transition-all cyber-glow-btn cyber-glow-btn-pink"
+              className="flex-1 bg-cyber-pink/20 border border-cyber-pink text-cyber-pink py-2 rounded font-orbitron font-bold text-[11px] sm:text-xs tracking-wider transition-all cyber-glow-btn cyber-glow-btn-pink"
             >
               CREATE CUSTOM MODE
             </button>
             <button
               type="submit"
-              className="flex-1 bg-cyber-cyan/20 border border-cyber-cyan text-cyber-cyan py-2 rounded font-orbitron font-bold tracking-widest transition-all cyber-glow-btn cyber-glow-btn-cyan"
+              className="flex-1 bg-cyber-cyan/20 border border-cyber-cyan text-cyber-cyan py-2 rounded font-orbitron font-bold text-[11px] sm:text-xs tracking-wider transition-all cyber-glow-btn cyber-glow-btn-cyan"
             >
               SAVE CONFIGURATION
             </button>
