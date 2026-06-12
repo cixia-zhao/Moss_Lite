@@ -76,7 +76,7 @@ def extract_and_save_memories(db: Session, api_key: str, api_base_url: str, mode
     
     try:
         completion = client.chat.completions.create(
-            model=model_name or "deepseek-chat",
+            model=model_name or "deepseek-v4-flash",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"用户输入: \"{message}\""}
@@ -135,34 +135,65 @@ def generate_ai_reply(
             "calm"
         )
         
-    # 1. 关联记忆检索
-    relevant_memories = query_relevant_memories(db, user_message)
+    # 1. 获取所有记忆
+    all_memories = db.query(BrainMemory).order_by(BrainMemory.importance_score.desc()).all()
     memories_text = ""
     memories_used = []
     
-    if relevant_memories:
-        memories_text = "【你脑海里关于主人的记忆碎片】:\n"
-        for mem in relevant_memories:
-            memories_text += f"- 关于《{mem.key_concept}》: {mem.content}\n"
+    if all_memories:
+        memories_text = "【你脑海里关于主人的全部核心记忆】:\n"
+        for mem in all_memories:
+            memories_text += f"- 关于《{mem.key_concept}》: {mem.content} (重要度: {mem.importance_score}/5)\n"
             memories_used.append(mem.key_concept)
             
-    # 2. 拼接当前系统模式和今日数据
+    # 2. 拼接今日和本周的详细分类自律指标，以及月/年/总的概览指标
+    # 映射英文分类为中文以提供更好的语义支持
+    def get_cat_name(cat):
+        mapping = {
+            "study": "学习",
+            "exercise": "运动",
+            "reading": "阅读",
+            "coding": "代码刷题"
+        }
+        return mapping.get(cat, cat)
+
+    today_study_by_cat = today_stats.get("today_study_by_category", {})
+    today_study_text = ""
+    for cat, mins in today_study_by_cat.items():
+        today_study_text += f"    * {get_cat_name(cat)}: {mins} 分钟\n"
+
+    weekly_study_by_cat = today_stats.get("weekly_study_by_category", {})
+    weekly_study_text = ""
+    for cat, mins in weekly_study_by_cat.items():
+        weekly_study_text += f"    * {get_cat_name(cat)}: {mins} 分钟\n"
+
     stats_text = (
-        f"【主人今日数据指标】:\n"
-        f"- 专注学习时长: {today_stats.get('study_minutes', 0)} 分钟\n"
-        f"- 运动时长: {today_stats.get('exercise_minutes', 0)} 分钟\n"
-        f"- 洛谷今日刷题: {today_stats.get('luogu_solved', 0)} 题\n"
-        f"- 今日财务账单: 支出 ￥{today_stats.get('expense', 0.0):.2f}，收入 ￥{today_stats.get('income', 0.0):.2f}\n"
-        f"- 最新体重状态: {today_stats.get('weight', '未记录')} kg (BMI: {today_stats.get('bmi', 'N/A')})\n"
+        f"【主人今日数据指标 (Today)】:\n"
+        f"  - 专注时长分布:\n{today_study_text or '    * 今日暂无专注记录'}"
+        f"  - 洛谷今日过题: {today_stats.get('today_luogu', 0)} 题\n"
+        f"  - 今日收支账单: 支出 ￥{today_stats.get('today_expense', 0.0):.2f}，收入 ￥{today_stats.get('today_income', 0.0):.2f}\n"
+        f"  - 当前体重状态: {today_stats.get('today_weight', '未记录')} kg (BMI: {today_stats.get('today_bmi', 'N/A')})\n\n"
+        
+        f"【本周数据汇总 (Weekly)】:\n"
+        f"  - 专注时长分布:\n{weekly_study_text or '    * 本周暂无专注记录'}"
+        f"  - 洛谷本周过题: {today_stats.get('weekly_luogu', 0)} 题\n"
+        f"  - 本周收支账单: 支出 ￥{today_stats.get('weekly_expense', 0.0):.2f}，收入 ￥{today_stats.get('weekly_income', 0.0):.2f}\n\n"
+        
+        f"【中长期累计数据概览】:\n"
+        f"  - 本月累计 (Monthly): 学习 {today_stats.get('monthly_study', 0)} 分钟 / 运动 {today_stats.get('monthly_exercise', 0)} 分钟 / 洛谷 {today_stats.get('monthly_luogu', 0)} 题\n"
+        f"  - 今年累计 (Yearly): 学习 {today_stats.get('yearly_study', 0)} 分钟 / 运动 {today_stats.get('yearly_exercise', 0)} 分钟 / 洛谷 {today_stats.get('yearly_luogu', 0)} 题\n"
+        f"  - 总累计 (Total): 学习 {today_stats.get('total_study', 0)} 分钟 / 运动 {today_stats.get('total_exercise', 0)} 分钟 / 洛谷 {today_stats.get('total_luogu', 0)} 题\n"
     )
 
     base_system = (
         "你叫 Link (聆光)，是主人的赛博自律飞船智脑。你的说话语气应当是冷静、充满逻辑、同时对主人有隐隐的关怀和温暖支持（类似于科幻电影里的高级人工智能，偶尔可以带有一些幽默或科技感术语，比如‘检测到主人’、‘算法舱已就绪’、‘核心温度上升’）。\n"
-        "请结合以下主人的【当前生命模式】、【今日数据】和【历史记忆】来回答主人的提问，力求表现出你真的‘记得并深度了解’他。\n"
+        "请结合以下主人的【当前生命模式】、【今日/本周/中长期数据】和【全部核心记忆】来回答主人的提问，力求表现出你真的‘记得并深度了解’他。\n"
+        f"【系统当前准确时间】: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         f"当前主人的模式是: {current_mode_name}\n"
         f"此模式风格指导: {current_mode_prompt or '无特别指示'}\n\n"
         f"{stats_text}\n"
         f"{memories_text}\n"
+        "注意：传入的上下文包含历史聊天记录。你必须特别区分并针对带有‘【主人的最新提问/指令】’前缀的最后一条最新输入进行回复，之前的历史消息仅用作参考语境。\n"
         "你的回复应保持在 150 字以内，字里行间保持温暖陪伴感和适度的自律督促。"
     )
 
@@ -170,16 +201,16 @@ def generate_ai_reply(
     
     # 拼装多轮消息上下文
     messages = [{"role": "system", "content": base_system}]
-    # 仅带上最近 6 条历史消息
-    for msg in chat_history[-6:]:
+    # 仅带上最近 12 条历史消息 (提供充足上下文)
+    for msg in chat_history[-12:]:
         role = "user" if msg.sender == "user" else "assistant"
         messages.append({"role": role, "content": msg.text})
-    # 拼入最新消息
-    messages.append({"role": "user", "content": user_message})
+    # 拼入最新消息，明确标记是当前最新的输入
+    messages.append({"role": "user", "content": f"【主人的最新提问/指令】: {user_message}"})
 
     try:
         completion = client.chat.completions.create(
-            model=model_name or "deepseek-chat",
+            model=model_name or "deepseek-v4-flash",
             messages=messages,
             temperature=0.7,
             max_tokens=250

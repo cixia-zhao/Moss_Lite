@@ -29,8 +29,12 @@ def migrate_database():
             cursor.execute("ALTER TABLE system_settings ADD COLUMN deepseek_api_base VARCHAR(200) DEFAULT 'https://api.deepseek.com/v1'")
             print("Successfully migrated system_settings: added deepseek_api_base")
         if "deepseek_model" not in columns:
-            cursor.execute("ALTER TABLE system_settings ADD COLUMN deepseek_model VARCHAR(50) DEFAULT 'deepseek-chat'")
+            cursor.execute("ALTER TABLE system_settings ADD COLUMN deepseek_model VARCHAR(50) DEFAULT 'deepseek-v4-flash'")
             print("Successfully migrated system_settings: added deepseek_model")
+        else:
+            # 确保已有的 'deepseek-chat' 或 NULL 被更新为 'deepseek-v4-flash'
+            cursor.execute("UPDATE system_settings SET deepseek_model = 'deepseek-v4-flash' WHERE deepseek_model = 'deepseek-chat' OR deepseek_model IS NULL")
+            print("Successfully updated existing system_settings values to deepseek-v4-flash")
         if "luogu_difficulty_stats" not in columns:
             cursor.execute("ALTER TABLE system_settings ADD COLUMN luogu_difficulty_stats TEXT")
             print("Successfully migrated system_settings: added luogu_difficulty_stats")
@@ -203,7 +207,7 @@ def check_and_send_reminders():
                     f"请直接给出一句 40 字以内的推送短句内容，不要多话。"
                 )
                 completion = client.chat.completions.create(
-                    model="deepseek-chat",
+                    model=settings.deepseek_model or "deepseek-v4-flash",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=60,
                     temperature=0.7

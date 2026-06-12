@@ -102,6 +102,11 @@ class BrainMemoryBase(BaseModel):
 class BrainMemoryCreate(BrainMemoryBase):
     pass
 
+class BrainMemoryUpdate(BaseModel):
+    key_concept: Optional[str] = None
+    content: Optional[str] = None
+    importance_score: Optional[int] = None
+
 class BrainMemoryResponse(BrainMemoryBase):
     id: int
     created_at: dt.datetime
@@ -119,6 +124,8 @@ class ChatResponse(BaseModel):
     reply: str
     hologram_state: str  # 'active' (活跃), 'calm' (平和), 'glitch' (故障), 'loading' (计时/思考中)
     memories_used: List[str] = []
+    user_message_id: Optional[int] = None
+    ai_message_id: Optional[int] = None
 
 # --- SystemSettings Schemas (存放在 settings 中) ---
 class SystemSettings(BaseModel):
@@ -132,7 +139,7 @@ class SystemSettings(BaseModel):
     reminder_time: str = "22:00"  # 每天推送时间
     reminder_enabled: bool = True
     deepseek_api_base: Optional[str] = "https://api.deepseek.com/v1"
-    deepseek_model: Optional[str] = "deepseek-chat"
+    deepseek_model: Optional[str] = "deepseek-v4-flash"
 
 # --- ChatMessage Schemas ---
 class ChatMessageResponse(BaseModel):
@@ -144,6 +151,13 @@ class ChatMessageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class MessageUpdateRequest(BaseModel):
+    text: str
+
+class MessageUpdateResponse(BaseModel):
+    user_message: ChatMessageResponse
+    ai_message: Optional[ChatMessageResponse] = None
 
 # --- FutureEvent Schemas ---
 class FutureEventBase(BaseModel):

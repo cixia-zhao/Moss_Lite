@@ -19,93 +19,54 @@
 
 ## 🚀 2. 本次会话已完成的工作 (Latest Session Upgrades — 2026-06-12)
 
-### 🔢 A. 认知参数舱 — 多维度时间切换
-**文件**: `frontend/src/App.jsx`
+### 🤖 A. 模型全面升级与时间幻觉修复
+**文件**: `backend/app/main.py`, `backend/app/api/chat.py`, `backend/app/services/ai_agent.py`
+- 将全局默认模型从 `deepseek-chat` 平滑升级到了更强大的 `deepseek-v4-flash`，并在系统初始化及自动升级脚本处完成强制迁移。
+- 修复了 AI 在处理涉及日期的意图时的“幻觉”：通过向 System Prompt 头部注入精确至秒级的绝对服务器系统时间，建立了 1:1 现实时间锚定。
 
-- 在「认知参数」面板顶部新增了 **总 / 年 / 月 / 周 / 日** 五个时间维度切换按钮（默认为「总」）。
-- 切换后，学习累计、运动量、洛谷通过、收支数据会同步对应时间范围的实际数值，而不是固定的 30 天。
-- 数据来源从 `stats.time_range_stats[cognitiveTimeRange]` 动态读取，兼容旧版 30 天字段。
+### 💬 B. 聊天组件滚动优化及体验重构
+**文件**: `frontend/src/components/ChatPanel.jsx`
+- 修复了因为原生 `scrollIntoView()` 强制引起整个浏览器页面视窗整体下拉的问题。现已由手动接管聊天容器本身的 `scrollTop = scrollHeight`，彻底断开与浏览器外部窗口的滚动联动，实现平滑内部局部滚动。
+- 升级了交互细节，加入了动态小垃圾桶与编辑铅笔发光图标。
 
-### 🔄 B. 页面加载自动同步 & 同步按钮更名
-**文件**: `frontend/src/App.jsx`
+### 📝 C. 消息流管理（编辑重组与单条删除）
+**文件**: `backend/app/api/chat.py`, `frontend/src/components/ChatPanel.jsx`, `backend/app/schemas.py`
+- 新增 `DELETE /api/chat/messages/{message_id}` 接口：当删除用户发送的消息时，自动连带级联删除该提问所紧随其后的专属 AI 响应，保持“问答双删”的体验；如果仅删除 AI 回复则实现单删。
+- 新增 `PUT /api/chat/messages/{message_id}` 接口：支持且仅支持编辑最近一次发出的用户对话。编辑保存后自动清理原有废弃回复，重载统计状态与聊天上下文进行全新大模型生成。前端已完整接入这一“悔牌重开”能力。
 
-- 原「同步洛谷」按钮改名为 **「同步数据」**（语义扩展，不单局限于洛谷）。
-- 页面首次加载完毕后，若已配置洛谷 UID，会在 200ms 后自动调用一次 `handleSyncDataSilent()`（静默同步），无需手动点击，通过 `autoSyncedRef` 防止重复触发。
+### 🧠 D. 记忆与上下文组装增强
+**文件**: `backend/app/services/ai_agent.py`, `backend/app/api/records.py`
+- **全量记忆注入**：依据用户反馈，撤除了原有仅载入前三条最相关碎片的限制，现在直接为 AI 注入脑海里的“全部有价值的心事与状态记录”。
+- **详尽状态供给**：对数据接口的复用（重构提取 `get_time_range_stats`），在传入智脑时增加了“今日”与“本周”精确到各分类项（如阅读、代码刷题、运动）的分布清单。长周期维持使用精简模式避免喧宾夺主。
+- **历史边界扩展与前缀标注**：对话溯源历史深度从 6 条增加至 **12** 条；此外，对最后一条最新的输入明确包裹了显眼的 `【主人的最新提问/指令】:` 标签并在 System prompt 中下达区分指令，防止在拼接过程中混淆。
 
-### 🏷️ C. 界面文案精简（翻译词条修正）
-**文件**: `frontend/src/contexts/LanguageContext.jsx`
-
-已修正以下翻译词条：
-
-| Key | 旧值 | 新值 |
-|---|---|---|
-| `settings.title` | 系统控制台设置 | 系统设置 |
-| `settings.lifeMode` | 生命阶段周期模式 | 模式/状态 |
-| `settings.currentPeriod` | 当前生命周期模式 | 当前模式/状态 |
-| `settings.registry` | 生命模式注册表 | 模式列表 |
-| `settings.solved` | 洛谷累计总通过 | 已计洛谷累计数 |
-| `app.cognitive` | 核心属性参数 | 认知参数 |
-| `app.syncLuogu` | 同步洛谷 | 同步数据 |
-| `ledger.expense` | 支出 (Expense) | 支出 |
-| `ledger.income` | 收入 (Income) | 收入 |
-| `settings.push` | Push Channel | 推送通道 |
-
-### ⚙️ D. 生命模式管理重构
-**文件**: `frontend/src/components/Settings.jsx`
-
-- **模式列表标题旁新增 `+` 号按钮**，取代原先独立的"创建自定义模式"按钮，视觉更紧凑。
-- **模式卡片全面去掉"模式"两字后缀**（通过正则 `replace(/模式$/, '').replace(/\s*Mode$/i, '')` 过滤），展示更简洁。
-- **所有模式卡片（包含内置系统模式）均支持点击编辑**：点击任意卡片将弹出编辑模态框，可自定义名称、备注、学习/运动/洛谷目标、AI 语气提示词。对内置模式使用 `PUT /api/modes/{id}` 更新，不允许修改英文 ID。
-- 弹出框标题：新建时显示「创建新生命模式」，编辑时显示「编辑生命状态」。
-
-### 📊 E. 后端统计接口扩展
-**文件**: `backend/app/api/records.py`
-
-- `GET /api/records/stats` 新增 `time_range_stats` 字段，包含 `total/yearly/monthly/weekly/daily` 五个维度的：
-  - `study_minutes`（学习时长，分钟）
-  - `exercise_minutes`（运动时长，分钟）
-  - `luogu_solved`（洛谷过题数；`total` 维度取 `luogu_total_solved` 系统设置字段）
-  - `expense`（支出金额，元）
-  - `income`（收入金额，元）
-
-### 🧪 F. 自动化测试（TDD 全覆盖）
+### 🧪 E. 测试集扩充
 **文件**: `backend/tests/test_main.py`
-
-- 新增 `test_stats_endpoint_with_time_ranges` 测试用例，验证各时间维度数据正确性。
-- **测试结果：8/8 全部通过**，含原有 7 条用例和新增 1 条。
+- 新编写 `test_chat_edit_delete` 用例。确保了“单条删除”、“级联删除”、“只能编辑最新消息”以及“编辑触发正确响应重建”后端功能的完备性。测试通过率维持 100%（9 / 9）。
 
 ---
 
 ## 🕰️ 3. 历史工作沉淀（前几个会话）
 
-### 视觉体系
+### 认知与模式配置 (Cognitive & Modes)
+- **多维度时间切换**：在认知参数面板支持 总/年/月/周/日 五个维度的动态切换，学习/运动/洛谷/账本等数值跟随响应式同步。
+- **静默自动同步**：页面加载完毕后静默调用 `handleSyncDataSilent()` 更新洛谷和其它指标面板。翻译词条大幅向简练专业修正（如将“同步洛谷”扩展修正为“同步数据”）。
+- **内置与自定义生命模式融合**：在卡片组件中剥离多余的“模式”文字，点击任意模式（内置或自定义）均支持编辑大模型风格参数。
+
+### 视觉体系 (Cyber Visuals)
 - 全局采用 `cyber-cyan`, `cyber-blue`, `cyber-pink` 赛博霓虹配色，杜绝基础原子色。
 - 微弱外发光（Neon Glow）+ 平缓呼吸动画体系（`cyber-glow-btn`, `cyber-border-glow`）。
 - 最小字号 `text-[10px]`，保障可读性下限。
 
-### 热力图（Heatmap）
-- `backend/app/models.py` 新增 `FutureEvent` 模型，支持未来日程里程碑。
-- 热力格根据最远未来事件日期动态延伸，琥珀色高亮未来预约节点。
-- 洛谷刷题热力图：颜色由当日最高难度决定（0–7 级），悬浮 Tooltip 显示日期、过题数、专注时长，底部显示月份，难度总统计显示在面板右侧。
-- 其他子页（学习/运动）热力图悬浮 Tooltip 只显示日期 + 对应时长（去除冗余字段）。
+### 热力图与专注统计 (Heatmap & Timer)
+- `backend/app/models.py` 新增 `FutureEvent` 模型，支持未来日程里程碑（高亮未来节点）。
+- 洛谷刷题热力图：颜色由当日最高难度决定（0–7 级），悬浮展示细节。
+- 多模式专注计时器：正向计秒、25/50 分钟番茄、自定义倒数。强制细分分类标签。
+- 独立统计面板组件：日/周/月/年/总 切换，霓虹光轨进度条展示占比。
 
-### 专注计时器（FocusTimer）
-- 多模式：正向计秒、25/50 分钟番茄、自定义倒数。
-- 强制分类标签：每次记录必须选定类目（学习、代码刷题、健身、阅读、自定义）。
-- 自定义倒数分钟数输入框旁有独立保存按钮，支持保存后立即计时。
-
-### 统计面板（StatisticsPanel）
-- 独立组件 `frontend/src/components/StatisticsPanel.jsx`。
-- 日/周/月/年/总 切换，霓虹光轨进度条展示各标签时长占比。
-- 累计数据（总时间字段）为只读，不可自定义。
-
-### AI 对话记忆（ChatPanel）
-- 对接 DeepSeek API，记忆核心持久化存储，支持按条删除记忆。
-- 语气由当前生命模式的 `ai_system_prompt` 字段驱动。
-
-### 账本（Ledger）
-- 手动记录支出/收入，CSV 导入（微信/支付宝格式智能解析）。
-- 中文环境下，支出/收入标签不含括号及英文。
+### 记忆面板与账本 (Memory & Ledger)
+- “✨ 记忆中枢” 面板分离弹窗，支持全景审阅脑电波记忆卡片。卡片支持双向编辑修正与丢弃。
+- 手动记录支出/收入，支持 CSV 导入（微信/支付宝格式智能解析）。
 
 ---
 
@@ -143,7 +104,7 @@ xitong/
     │   └── services/
     │       └── luogu_scraper.py    # 洛谷用户数据抓取服务
     └── tests/
-        └── test_main.py            # 自动化测试（8 个用例）
+        └── test_main.py            # 自动化测试（9 个用例）
 ```
 
 ---

@@ -76,7 +76,7 @@ class SystemSetting(Base):
     reminder_time = Column(String(10), default="22:00")                # 每日推送提醒时间
     reminder_enabled = Column(Boolean, default=True)                   # 是否开启推送
     deepseek_api_base = Column(String(200), default="https://api.deepseek.com/v1")  # API 基地址
-    deepseek_model = Column(String(50), default="deepseek-chat")       # 对话模型名称
+    deepseek_model = Column(String(50), default="deepseek-v4-flash")   # 对话模型名称
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"

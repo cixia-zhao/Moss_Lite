@@ -10,7 +10,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
   const [luoguTotalSolved, setLuoguTotalSolved] = useState(settings.luogu_total_solved || 0);
   const [deepseekKey, setDeepseekKey] = useState(settings.deepseek_api_key || "");
   const [deepseekBase, setDeepseekBase] = useState(settings.deepseek_api_base || "https://api.deepseek.com/v1");
-  const [deepseekModel, setDeepseekModel] = useState(settings.deepseek_model || "deepseek-chat");
+  const [deepseekModel, setDeepseekModel] = useState(settings.deepseek_model || "deepseek-v4-flash");
   const [pushDeerKey, setPushDeerKey] = useState(settings.push_deer_key || "");
   const [barkKey, setBarkKey] = useState(settings.bark_key || "");
   const [reminderTime, setReminderTime] = useState(settings.reminder_time || "22:00");
@@ -44,7 +44,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
     setReminderTime(settings.reminder_time || "22:00");
     setReminderEnabled(settings.reminder_enabled ?? true);
     setDeepseekBase(settings.deepseek_api_base || "https://api.deepseek.com/v1");
-    setDeepseekModel(settings.deepseek_model || "deepseek-chat");
+    setDeepseekModel(settings.deepseek_model || "deepseek-v4-flash");
   }, [settings]);
 
   // 保存系统设置
@@ -63,7 +63,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
       reminder_time: reminderTime,
       reminder_enabled: reminderEnabled,
       deepseek_api_base: deepseekBase || "https://api.deepseek.com/v1",
-      deepseek_model: deepseekModel || "deepseek-chat"
+      deepseek_model: deepseekModel || "deepseek-v4-flash"
     };
 
     try {
@@ -284,7 +284,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 type="text"
                 value={deepseekModel}
                 onChange={(e) => setDeepseekModel(e.target.value)}
-                placeholder="默认: deepseek-chat"
+                placeholder="默认: deepseek-v4-flash"
                 className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
               />
             </div>

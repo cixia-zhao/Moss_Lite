@@ -329,3 +329,46 @@ def test_stats_endpoint_with_time_ranges():
     assert time_stats["total"]["expense"] == 65.5
     assert time_stats["total"]["income"] == 100.0
 
+def test_chat_edit_delete():
+    # 1. 确认初始状态
+    response = client.delete("/api/chat/history")
+    assert response.status_code == 200
+
+    # 2. Mock 方式发送两条对话记录
+    with patch("app.api.chat.generate_ai_reply") as mock_generate:
+        mock_generate.return_value = ("你好！我是 Link。", [], "active")
+        
+        payload = {"message": "你好"}
+        response = client.post("/api/chat", json=payload)
+        assert response.status_code == 200
+        
+    history = client.get("/api/chat/history").json()
+    assert len(history) == 2
+    user_msg_id = history[0]["id"]
+    ai_msg_id = history[1]["id"]
+    
+    # 3. 测试编辑用户消息
+    with patch("app.api.chat.generate_ai_reply") as mock_generate:
+        mock_generate.return_value = ("已为你重新载入系统。", [], "calm")
+        
+        payload_edit = {"text": "重新唤醒系统"}
+        response = client.put(f"/api/chat/messages/{user_msg_id}", json=payload_edit)
+        assert response.status_code == 200
+        edit_data = response.json()
+        assert edit_data["user_message"]["text"] == "重新唤醒系统"
+        assert edit_data["ai_message"]["text"] == "已为你重新载入系统。"
+        
+    # 4. 再次查看历史，应该仍为 2 条，且内容更新
+    history = client.get("/api/chat/history").json()
+    assert len(history) == 2
+    assert history[0]["text"] == "重新唤醒系统"
+    assert history[1]["text"] == "已为你重新载入系统。"
+    
+    # 5. 测试删除消息极其级联回复
+    response = client.delete(f"/api/chat/messages/{user_msg_id}")
+    assert response.status_code == 200
+    
+    # 6. 历史记录应该全空了
+    history = client.get("/api/chat/history").json()
+    assert len(history) == 0
+

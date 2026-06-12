@@ -128,53 +128,12 @@ def update_daily_metric(target_date: date, payload: DailyMetricUpdate, db: Sessi
 
 # --- 统计与热力图 API ---
 
-@router.get("/records/stats")
-def get_stats(db: Session = Depends(get_db)):
-    """获取整体自律统计情况，包含不同周期维度的分类解析"""
+def get_time_range_stats(db: Session) -> dict:
     today = date.today()
-    start_30 = today - timedelta(days=30)
-    
-    # 基础 30 天汇总 (兼容原代码)
-    total_study = db.query(func.sum(StudyRecord.duration_minutes)).filter(StudyRecord.date >= start_30, StudyRecord.category != "exercise").scalar() or 0
-    total_exercise = db.query(func.sum(StudyRecord.duration_minutes)).filter(StudyRecord.date >= start_30, StudyRecord.category == "exercise").scalar() or 0
-    income_30 = db.query(func.sum(FinancialRecord.amount)).filter(FinancialRecord.date >= start_30, FinancialRecord.type == "income").scalar() or 0.0
-    expense_30 = db.query(func.sum(FinancialRecord.amount)).filter(FinancialRecord.date >= start_30, FinancialRecord.type == "expense").scalar() or 0.0
-    total_luogu = db.query(func.sum(DailyMetric.luogu_solved_count)).filter(DailyMetric.date >= start_30).scalar() or 0
-    
-    # 获取所有的专注记录用于构建高级聚合面板
-    all_study_records = db.query(StudyRecord).all()
-    
-    # 定义时间维度的界限
     start_week = today - timedelta(days=today.weekday())
     start_month = today.replace(day=1)
     start_year = today.replace(month=1, day=1)
     
-    stats_data = {
-        "daily": {},
-        "weekly": {},
-        "monthly": {},
-        "yearly": {},
-        "total": {}
-    }
-    
-    for r in all_study_records:
-        cat = r.category or "study"
-        # Total
-        stats_data["total"][cat] = stats_data["total"].get(cat, 0) + r.duration_minutes
-        # Daily
-        if r.date == today:
-            stats_data["daily"][cat] = stats_data["daily"].get(cat, 0) + r.duration_minutes
-        # Weekly
-        if r.date >= start_week:
-            stats_data["weekly"][cat] = stats_data["weekly"].get(cat, 0) + r.duration_minutes
-        # Monthly
-        if r.date >= start_month:
-            stats_data["monthly"][cat] = stats_data["monthly"].get(cat, 0) + r.duration_minutes
-        # Yearly
-        if r.date >= start_year:
-            stats_data["yearly"][cat] = stats_data["yearly"].get(cat, 0) + r.duration_minutes
-
-    # 计算各周期维度属性汇总数据 (总, 年, 月, 周, 日)
     ranges = {
         "total": None,
         "yearly": start_year,
@@ -226,6 +185,55 @@ def get_stats(db: Session = Depends(get_db)):
             "expense": round(float(expense_val), 2),
             "income": round(float(income_val), 2)
         }
+    return time_range_stats
+
+@router.get("/records/stats")
+def get_stats(db: Session = Depends(get_db)):
+    """获取整体自律统计情况，包含不同周期维年的分类解析"""
+    today = date.today()
+    start_30 = today - timedelta(days=30)
+    
+    # 基础 30 天汇总 (兼容原代码)
+    total_study = db.query(func.sum(StudyRecord.duration_minutes)).filter(StudyRecord.date >= start_30, StudyRecord.category != "exercise").scalar() or 0
+    total_exercise = db.query(func.sum(StudyRecord.duration_minutes)).filter(StudyRecord.date >= start_30, StudyRecord.category == "exercise").scalar() or 0
+    income_30 = db.query(func.sum(FinancialRecord.amount)).filter(FinancialRecord.date >= start_30, FinancialRecord.type == "income").scalar() or 0.0
+    expense_30 = db.query(func.sum(FinancialRecord.amount)).filter(FinancialRecord.date >= start_30, FinancialRecord.type == "expense").scalar() or 0.0
+    total_luogu = db.query(func.sum(DailyMetric.luogu_solved_count)).filter(DailyMetric.date >= start_30).scalar() or 0
+    
+    # 获取所有的专注记录用于构建高级聚合面板
+    all_study_records = db.query(StudyRecord).all()
+    
+    # 定义时间维度的界限
+    start_week = today - timedelta(days=today.weekday())
+    start_month = today.replace(day=1)
+    start_year = today.replace(month=1, day=1)
+    
+    stats_data = {
+        "daily": {},
+        "weekly": {},
+        "monthly": {},
+        "yearly": {},
+        "total": {}
+    }
+    
+    for r in all_study_records:
+        cat = r.category or "study"
+        # Total
+        stats_data["total"][cat] = stats_data["total"].get(cat, 0) + r.duration_minutes
+        # Daily
+        if r.date == today:
+            stats_data["daily"][cat] = stats_data["daily"].get(cat, 0) + r.duration_minutes
+        # Weekly
+        if r.date >= start_week:
+            stats_data["weekly"][cat] = stats_data["weekly"].get(cat, 0) + r.duration_minutes
+        # Monthly
+        if r.date >= start_month:
+            stats_data["monthly"][cat] = stats_data["monthly"].get(cat, 0) + r.duration_minutes
+        # Yearly
+        if r.date >= start_year:
+            stats_data["yearly"][cat] = stats_data["yearly"].get(cat, 0) + r.duration_minutes
+
+    time_range_stats = get_time_range_stats(db)
 
     return {
         "study_30days": total_study,
