@@ -12,7 +12,7 @@ def send_bark_notification(device_key: str, title: str, body: str) -> bool:
         "title": title,
         "body": body,
         "sound": "calypso",
-        "icon": "https://img.icons8.com/isometric/512/processor.png"  # MOSS风格图标
+        "icon": "https://img.icons8.com/isometric/512/processor.png"  # Link风格图标
     }
     
     try:

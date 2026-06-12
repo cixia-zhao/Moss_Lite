@@ -74,6 +74,7 @@ class DailyMetricBase(BaseModel):
     height: Optional[float] = None
     bmi: Optional[float] = None
     luogu_solved_count: int = 0
+    luogu_max_difficulty: int = 0
     overall_rating: str = "B"
     user_mood: Optional[str] = None
     ai_diary_review: Optional[str] = None
@@ -82,6 +83,7 @@ class DailyMetricUpdate(BaseModel):
     weight: Optional[float] = None
     height: Optional[float] = None
     luogu_solved_count: Optional[int] = None
+    luogu_max_difficulty: Optional[int] = None
     user_mood: Optional[str] = None
     ai_diary_review: Optional[str] = None
 
@@ -123,11 +125,25 @@ class SystemSettings(BaseModel):
     current_mode: str = "cozy"
     luogu_uid: Optional[str] = None
     luogu_total_solved: int = 0
+    luogu_difficulty_stats: Optional[str] = None
     deepseek_api_key: Optional[str] = None
     push_deer_key: Optional[str] = None
     bark_key: Optional[str] = None
     reminder_time: str = "22:00"  # 每天推送时间
     reminder_enabled: bool = True
+    deepseek_api_base: Optional[str] = "https://api.deepseek.com/v1"
+    deepseek_model: Optional[str] = "deepseek-chat"
+
+# --- ChatMessage Schemas ---
+class ChatMessageResponse(BaseModel):
+    id: int
+    sender: str
+    text: str
+    timestamp: dt.datetime
+    state: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 # --- FutureEvent Schemas ---
 class FutureEventBase(BaseModel):

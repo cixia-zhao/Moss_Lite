@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { BarChart2, Calendar, Target, Clock, Activity, Zap } from "lucide-react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export default function StatisticsPanel({ stats }) {
+  const { t } = useLanguage();
   const [timeRange, setTimeRange] = useState("daily"); // daily, weekly, monthly, yearly, total
   
   if (!stats || !stats.advanced_stats) {
@@ -26,10 +28,10 @@ export default function StatisticsPanel({ stats }) {
   };
 
   const getCategoryName = (cat) => {
-    if (cat === "study") return "学术复习";
-    if (cat === "coding") return "代码开发";
-    if (cat === "exercise") return "体育运动";
-    if (cat === "reading") return "书籍阅读";
+    if (cat === "study") return t('heatmap.study');
+    if (cat === "coding") return t('heatmap.luogu');
+    if (cat === "exercise") return t('heatmap.exercise');
+    if (cat === "reading") return t('timer.reading');
     return cat.toUpperCase();
   };
 
@@ -46,18 +48,18 @@ export default function StatisticsPanel({ stats }) {
         <div className="flex items-center gap-2">
           <BarChart2 className="w-4 h-4 text-cyber-cyan" />
           <h3 className="font-orbitron font-bold text-sm text-cyber-cyan tracking-widest">
-            ADVANCED STATS
+            {t('stats.title')}
           </h3>
         </div>
         
         {/* 时间维度切换器 */}
         <div className="flex gap-1 font-mono text-xs bg-cyber-bg/50 p-1 rounded border border-cyber-blue/10">
           {[
-            { id: "daily", label: "日" },
-            { id: "weekly", label: "周" },
-            { id: "monthly", label: "月" },
-            { id: "yearly", label: "年" },
-            { id: "total", label: "总" }
+            { id: "daily", label: t('stats.daily') },
+            { id: "weekly", label: t('stats.weekly') },
+            { id: "monthly", label: t('stats.monthly') },
+            { id: "yearly", label: t('stats.yearly') },
+            { id: "total", label: t('stats.total') }
           ].map(tab => (
             <button
               key={tab.id}
@@ -78,7 +80,7 @@ export default function StatisticsPanel({ stats }) {
         {sortedCategories.length === 0 ? (
           <div className="text-center text-gray-600 font-mono text-xs py-10 flex flex-col items-center gap-2">
              <Zap className="w-6 h-6 text-gray-700" />
-             <p>该时段暂无专注记录</p>
+             <p>{t('stats.empty')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -86,7 +88,7 @@ export default function StatisticsPanel({ stats }) {
             <div className="flex justify-between items-center bg-cyber-blue/5 border border-cyber-blue/20 p-3 rounded">
               <div className="flex items-center gap-2 text-gray-400 font-mono text-xs">
                  <Clock className="w-4 h-4 text-cyber-cyan" />
-                 <span>累计时段专注</span>
+                 <span>{t('stats.cumulative')}</span>
               </div>
               <div className="font-orbitron font-black text-xl text-cyber-cyan cyber-text-glow">
                  {formatDuration(getTotalDuration())}

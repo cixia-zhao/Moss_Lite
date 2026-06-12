@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { Calendar, HelpCircle, Plus, AlertCircle, Trash } from "lucide-react";
+import { Calendar, HelpCircle, Plus, AlertCircle } from "lucide-react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export default function Heatmap({ data, onRefresh, apiUrl }) {
+  const { t } = useLanguage();
   const [dimension, setDimension] = useState("combined"); // "combined", "luogu", "study", "exercise"
   const [hoveredCell, setHoveredCell] = useState(null);
   
@@ -11,6 +13,10 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
   const [eventTitle, setEventTitle] = useState("");
   const [eventDesc, setEventDesc] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // 兼容老版本的数组格式与新版本对象格式
+  const points = Array.isArray(data) ? data : (data?.points || []);
+  const difficultyStats = Array.isArray(data) ? { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 } : (data?.difficulty_stats || { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 });
 
   const handleCreateEvent = async (e) => {
     e.preventDefault();
@@ -73,10 +79,15 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
     }
     
     if (dimension === "luogu") {
-      if (val === 1) return "bg-cyber-pink/20 border-cyber-pink/30 shadow-[0_0_4px_rgba(255,0,127,0.1)]";
-      if (val === 2) return "bg-cyber-pink/40 border-cyber-pink/50 shadow-[0_0_6px_rgba(255,0,127,0.25)]";
-      if (val === 3) return "bg-cyber-pink/70 border-cyber-pink/80 shadow-[0_0_8px_rgba(255,0,127,0.4)]";
-      return "bg-cyber-pink border-white shadow-[0_0_12px_rgba(255,0,127,0.65)]";
+      const maxDiff = cell.luogu_max_difficulty || 0;
+      if (maxDiff === 0) return "bg-gray-600/30 border-gray-500/40 shadow-[0_0_4px_rgba(156,163,175,0.2)]"; // 暂无评定
+      if (maxDiff === 1) return "bg-[#fe4c61]/35 border-[#fe4c61]/65 text-[#fe4c61] shadow-[0_0_6px_rgba(254,76,97,0.3)]"; // 入门
+      if (maxDiff === 2) return "bg-[#f39c11]/35 border-[#f39c11]/65 text-[#f39c11] shadow-[0_0_6px_rgba(243,156,17,0.3)]"; // 普及-
+      if (maxDiff === 3) return "bg-[#ffc107]/35 border-[#ffc107]/65 text-[#ffc107] shadow-[0_0_6px_rgba(255,193,7,0.3)]"; // 普及/提高-
+      if (maxDiff === 4) return "bg-[#52c41a]/35 border-[#52c41a]/65 text-[#52c41a] shadow-[0_0_6px_rgba(82,196,26,0.3)]"; // 普及+/提高
+      if (maxDiff === 5) return "bg-[#2196f3]/35 border-[#2196f3]/65 text-[#2196f3] shadow-[0_0_6px_rgba(33,150,243,0.3)]"; // 提高+/省选-
+      if (maxDiff === 6) return "bg-[#9c27b0]/35 border-[#9c27b0]/65 text-[#9c27b0] shadow-[0_0_6px_rgba(156,39,176,0.3)]"; // 省选/NOI-
+      return "bg-[#0e1d69]/50 border-[#0e1d69]/80 text-[#0e1d69] shadow-[0_0_8px_rgba(14,29,105,0.45)]"; // NOI/NOI+/CTSC
     }
 
     if (dimension === "study") {
@@ -97,12 +108,10 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
   };
 
   const renderGridCells = () => {
-    if (!data || data.length === 0) return null;
+    if (!points || points.length === 0) return null;
     
     const cells = [];
-    // 为防止时区偏差，将字串直接以 UTC 甚至时区 0 来解析，或用 getUTCDay()。
-    // ISO 日期串 "2024-01-01" 加上 "T00:00:00" 并在本地计算
-    const dStr = data[0].date + "T00:00:00";
+    const dStr = points[0].date + "T00:00:00";
     const firstDate = new Date(dStr);
     const startPadding = firstDate.getDay(); 
     
@@ -110,7 +119,7 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
       cells.push(<div key={`pad-${i}`} className="w-3.5 h-3.5 bg-transparent" />);
     }
 
-    data.forEach((cell) => {
+    points.forEach((cell) => {
       cells.push(
         <div
           key={cell.date}
@@ -122,6 +131,63 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
     });
 
     return cells;
+  };
+
+  const renderMonthLabels = () => {
+    if (!points || points.length === 0) return null;
+    const dStr = points[0].date + "T00:00:00";
+    const firstDate = new Date(dStr);
+    const startPadding = firstDate.getDay(); 
+    const columnsCount = Math.ceil((points.length + startPadding) / 7);
+    
+    const cols = Array.from({ length: columnsCount });
+    let lastMonth = -1;
+    
+    return (
+      <div className="grid grid-flow-col gap-[3px] auto-cols-max text-[10px] font-mono text-gray-500 mt-1.5 ml-[38px] select-none">
+        {cols.map((_, col) => {
+          const dayIdx = col * 7 - startPadding;
+          if (dayIdx >= 0 && dayIdx < points.length) {
+            const d = new Date(points[dayIdx].date + "T00:00:00");
+            const m = d.getMonth();
+            if (m !== lastMonth) {
+              lastMonth = m;
+              return (
+                <div key={`m-${col}`} className="w-3.5 text-left truncate" style={{ minWidth: "14px" }}>
+                  {m + 1}月
+                </div>
+              );
+            }
+          }
+          return <div key={`m-${col}`} className="w-3.5" style={{ minWidth: "14px" }} />;
+        })}
+      </div>
+    );
+  };
+
+  const renderDifficultyStats = () => {
+    const diffList = [
+      { key: "0", label: "暂无评定", color: "bg-gray-800/40 border-gray-700/50 text-gray-400" },
+      { key: "1", label: "入门", color: "bg-[#fe4c61]/15 border-[#fe4c61]/35 text-[#fe4c61]" },
+      { key: "2", label: "普及-", color: "bg-[#f39c11]/15 border-[#f39c11]/35 text-[#f39c11]" },
+      { key: "3", label: "普及/提高-", color: "bg-[#ffc107]/15 border-[#ffc107]/35 text-[#ffc107]" },
+      { key: "4", label: "普及+/提高", color: "bg-[#52c41a]/15 border-[#52c41a]/35 text-[#52c41a]" },
+      { key: "5", label: "提高+/省选-", color: "bg-[#2196f3]/15 border-[#2196f3]/35 text-[#2196f3]" },
+      { key: "6", label: "省选/NOI-", color: "bg-[#9c27b0]/15 border-[#9c27b0]/35 text-[#9c27b0]" },
+      { key: "7", label: "NOI/NOI+/CTSC", color: "bg-[#0e1d69]/20 border-[#0e1d69]/40 text-[#0e1d69]" }
+    ];
+
+    return diffList.map(item => {
+      const count = difficultyStats[item.key] || 0;
+      return (
+        <div key={item.key} className="flex justify-between items-center py-1 border-b border-cyber-blue/10 last:border-0 text-[10px]">
+          <span className={`px-1.5 py-0.5 rounded border text-[9px] ${item.color} scale-95 origin-left`}>
+            {item.label}
+          </span>
+          <strong className="text-cyber-cyan">{count} 题</strong>
+        </div>
+      );
+    });
   };
 
   const getRatingDesc = (rating) => {
@@ -147,13 +213,13 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-cyber-cyan" />
           <h3 className="font-orbitron font-bold text-sm text-cyber-cyan tracking-widest">
-            COGNITIVE HEATMAP
+            {t('heatmap.title')}
           </h3>
           <button 
             onClick={() => setShowEventModal(true)}
             className="ml-2 flex items-center gap-1 px-2 py-0.5 border border-amber-500/50 text-amber-500 hover:bg-amber-500/20 text-[10px] font-mono rounded"
           >
-            <Plus className="w-3 h-3" /> 未来日程
+            + {t('heatmap.addEvent')}
           </button>
         </div>
         
@@ -164,7 +230,7 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
               dimension === "combined" ? "bg-cyber-cyan/20 border-cyber-cyan text-cyber-cyan cyber-text-glow" : "border-gray-800 text-gray-500 hover:text-cyber-blue"
             }`}
           >
-            🔥 综合活跃
+            {t('heatmap.combined')}
           </button>
           <button
             onClick={() => setDimension("luogu")}
@@ -172,7 +238,7 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
               dimension === "luogu" ? "bg-cyber-pink/20 border-cyber-pink text-cyber-pink cyber-text-glow-pink" : "border-gray-800 text-gray-500 hover:text-cyber-blue"
             }`}
           >
-            💻 洛谷刷题
+            {t('heatmap.luogu')}
           </button>
           <button
             onClick={() => setDimension("study")}
@@ -180,7 +246,7 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
               dimension === "study" ? "bg-purple-500/20 border-purple-500 text-purple-400" : "border-gray-800 text-gray-500 hover:text-cyber-blue"
             }`}
           >
-            📖 学习时间
+            {t('heatmap.study')}
           </button>
           <button
             onClick={() => setDimension("exercise")}
@@ -188,37 +254,56 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
               dimension === "exercise" ? "bg-cyber-green/20 border-cyber-green text-cyber-green" : "border-gray-800 text-gray-500 hover:text-cyber-blue"
             }`}
           >
-            🏃 体育健身
+            {t('heatmap.exercise')}
           </button>
         </div>
       </div>
 
-      {/* 热力图网格 */}
-      <div className="relative overflow-x-auto py-2 heatmap-scroll-container">
-        <div className="flex gap-2 min-w-max items-center">
-          {/* 左侧星期指示 - 完美对齐 */}
-          <div className="grid grid-rows-7 gap-[3px] text-[11px] font-mono text-gray-600 pr-1.5 h-[116px]">
-            <span className="h-3.5 flex items-center">周日</span>
-            <span className="h-3.5 invisible">周一</span>
-            <span className="h-3.5 flex items-center">周二</span>
-            <span className="h-3.5 invisible">周三</span>
-            <span className="h-3.5 flex items-center">周四</span>
-            <span className="h-3.5 invisible">周五</span>
-            <span className="h-3.5 flex items-center">周六</span>
-          </div>
-          
-          <div className="flex-1">
-            <div className="grid grid-flow-col grid-rows-7 gap-[3px] auto-cols-max h-[116px]">
-              {renderGridCells()}
+      {/* 主热力图与侧栏统计并排容器 */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        
+        {/* 左侧：热力图网格和月份对齐标识 */}
+        <div className="flex-1 w-full relative overflow-x-auto py-2 heatmap-scroll-container">
+          <div className="flex gap-2 min-w-max items-center">
+            {/* 左侧星期指示 - 完美对齐 */}
+            <div className="grid grid-rows-7 gap-[3px] text-[11px] font-mono text-gray-600 pr-1.5 h-[116px]">
+              <span className="h-3.5 flex items-center">周日</span>
+              <span className="h-3.5 invisible">周一</span>
+              <span className="h-3.5 flex items-center">周二</span>
+              <span className="h-3.5 invisible">周三</span>
+              <span className="h-3.5 flex items-center">周四</span>
+              <span className="h-3.5 invisible">周五</span>
+              <span className="h-3.5 flex items-center">周六</span>
+            </div>
+            
+            <div className="flex-1">
+              <div className="grid grid-flow-col grid-rows-7 gap-[3px] auto-cols-max h-[116px]">
+                {renderGridCells()}
+              </div>
             </div>
           </div>
+          
+          {/* 月份对齐指示栏 */}
+          {renderMonthLabels()}
         </div>
+
+        {/* 右侧：难度总统计小面板（仅在洛谷维度下展示） */}
+        {dimension === "luogu" && (
+          <div className="w-full lg:w-44 bg-cyber-card/30 border border-cyber-pink/20 rounded p-3 font-mono text-xs text-cyber-text space-y-1.5 shrink-0 shadow-[0_0_12px_rgba(255,0,127,0.1)]">
+            <h4 className="font-orbitron font-bold text-cyber-pink border-b border-cyber-pink/20 pb-1.5 mb-2 text-[10px] tracking-wider uppercase text-center">
+              🏆 难度总统计
+            </h4>
+            <div className="space-y-1">
+              {renderDifficultyStats()}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between items-center mt-3 pt-3 border-t border-cyber-blue/10 font-mono text-xs text-gray-600">
         <span className="flex items-center gap-1">
           <HelpCircle className="w-3 h-3 text-gray-600" />
-          光格代表当天活跃度：越深越自律 (虚线为未来规划)
+          {t('heatmap.hint')}
         </span>
       </div>
 
@@ -239,7 +324,7 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
           {hoveredCell.is_future && (
             <div className="mb-2">
                <span className="bg-amber-500/20 text-amber-500 px-1 py-0.5 rounded border border-amber-500/30">
-                  倒计时: {getDaysDiff(hoveredCell.date)} 天
+                  {t('heatmap.countdown', { days: getDaysDiff(hoveredCell.date) })}
                </span>
             </div>
           )}
@@ -257,23 +342,57 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
 
           {!hoveredCell.is_future && (
             <div className="space-y-1 text-gray-400">
-              <div className="flex justify-between">
-                <span>📚 学习时长:</span>
-                <strong className="text-cyber-cyan">{hoveredCell.study_minutes} min</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>🏃 运动时长:</span>
-                <strong className="text-cyber-green">{hoveredCell.exercise_minutes} min</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>💻 洛谷刷题:</span>
-                <strong className="text-cyber-pink">{hoveredCell.luogu_solved} 题</strong>
-              </div>
-              <div className="flex justify-between border-t border-cyber-blue/10 pt-1 mt-1">
-                <span>💰 今日支出:</span>
-                <strong className="text-amber-500">￥{hoveredCell.expense}</strong>
-              </div>
-              <div className="text-[11px] text-cyber-cyan/50 mt-1">
+              {dimension === "combined" && (
+                <>
+                  <div className="flex justify-between">
+                    <span>📚 学习时长:</span>
+                    <strong className="text-cyber-cyan">{hoveredCell.study_minutes} min</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>🏃 运动时长:</span>
+                    <strong className="text-cyber-green">{hoveredCell.exercise_minutes} min</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>💻 洛谷刷题:</span>
+                    <strong className="text-cyber-pink">{hoveredCell.luogu_solved} 题</strong>
+                  </div>
+                </>
+              )}
+              
+              {dimension === "study" && (
+                <div className="flex justify-between">
+                  <span>📚 学习时长:</span>
+                  <strong className="text-cyber-cyan">{hoveredCell.study_minutes} min</strong>
+                </div>
+              )}
+              
+              {dimension === "exercise" && (
+                <div className="flex justify-between">
+                  <span>🏃 运动时长:</span>
+                  <strong className="text-cyber-green">{hoveredCell.exercise_minutes} min</strong>
+                </div>
+              )}
+              
+              {dimension === "luogu" && (
+                <>
+                  <div className="flex justify-between">
+                    <span>💻 当日过题:</span>
+                    <strong className="text-cyber-pink">{hoveredCell.luogu_solved} 题</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>最高难度:</span>
+                    <strong className="text-amber-400">
+                      {["暂无评定", "入门", "普及-", "普及/提高-", "普及+/提高", "提高+/省选-", "省选/NOI-", "NOI/NOI+/CTSC"][hoveredCell.luogu_max_difficulty || 0]}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>刷题时长:</span>
+                    <strong className="text-cyber-cyan">{hoveredCell.coding_minutes || 0} min</strong>
+                  </div>
+                </>
+              )}
+
+              <div className="text-[11px] text-cyber-cyan/50 border-t border-cyber-blue/10 pt-1 mt-1">
                 {getRatingDesc(hoveredCell.rating)}
               </div>
             </div>
@@ -286,7 +405,7 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <form onSubmit={handleCreateEvent} className="bg-cyber-card border border-amber-500/50 rounded-lg p-5 w-full max-w-sm font-mono text-xs text-cyber-text space-y-3">
             <h3 className="font-orbitron font-bold text-sm text-amber-500 mb-2 tracking-widest border-b border-amber-500/20 pb-2">
-              ADD MILESTONE
+              {t('heatmap.addMilestone')}
             </h3>
             {errorMsg && (
               <div className="flex items-center gap-1.5 p-2 bg-red-900/40 border border-red-500/50 text-red-400 rounded">
@@ -294,20 +413,20 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
               </div>
             )}
             <div>
-              <label className="block text-amber-500/70 mb-1">目标日期</label>
+              <label className="block text-amber-500/70 mb-1">{t('heatmap.targetDate')}</label>
               <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required className="w-full bg-cyber-bg border border-amber-500/30 rounded px-2 py-1.5 outline-none text-amber-500 focus:border-amber-500" />
             </div>
             <div>
-              <label className="block text-amber-500/70 mb-1">事件名称 (如 六级考试)</label>
+              <label className="block text-amber-500/70 mb-1">{t('heatmap.eventName')}</label>
               <input type="text" value={eventTitle} onChange={e => setEventTitle(e.target.value)} required className="w-full bg-cyber-bg border border-amber-500/30 rounded px-2 py-1.5 outline-none text-amber-500 focus:border-amber-500" />
             </div>
             <div>
-              <label className="block text-amber-500/70 mb-1">备注详情</label>
+              <label className="block text-amber-500/70 mb-1">{t('heatmap.eventDesc')}</label>
               <input type="text" value={eventDesc} onChange={e => setEventDesc(e.target.value)} className="w-full bg-cyber-bg border border-amber-500/30 rounded px-2 py-1.5 outline-none text-amber-500 focus:border-amber-500" />
             </div>
             <div className="flex gap-2 pt-2">
-              <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 border border-gray-600 text-gray-400 py-1.5 rounded hover:bg-gray-800">CANCEL</button>
-              <button type="submit" className="flex-1 bg-amber-500/20 border border-amber-500 text-amber-500 py-1.5 rounded hover:bg-amber-500/30">ADD EVENT</button>
+              <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 border border-gray-600 text-gray-400 py-1.5 rounded hover:bg-gray-800">{t('settings.cancel')}</button>
+              <button type="submit" className="flex-1 bg-amber-500/20 border border-amber-500 text-amber-500 py-1.5 rounded hover:bg-amber-500/30">{t('heatmap.addEventBtn')}</button>
             </div>
           </form>
         </div>

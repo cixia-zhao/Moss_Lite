@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Cpu, RefreshCw, BarChart2, ShieldAlert, Sparkles, LogOut, Sun } from "lucide-react";
 
 import HologramCore from "./components/HologramCore";
@@ -8,11 +8,13 @@ import Ledger from "./components/Ledger";
 import ChatPanel from "./components/ChatPanel";
 import Settings from "./components/Settings";
 import StatisticsPanel from "./components/StatisticsPanel";
+import { useLanguage } from "./contexts/LanguageContext";
 
 // 根据开发环境动态获取 API 端口地址
 const API_URL = import.meta.env.DEV ? "http://localhost:8000" : "";
 
 export default function App() {
+  const { t, lang, toggleLang } = useLanguage();
   const [settings, setSettings] = useState({
     current_mode: "cozy",
     luogu_uid: "",
@@ -38,6 +40,35 @@ export default function App() {
   const [isSyncingLuogu, setIsSyncingLuogu] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [cognitiveTimeRange, setCognitiveTimeRange] = useState("total");
+  const autoSyncedRef = useRef(false);
+
+  // 页面打开时自动同步数据的方法
+  const handleSyncDataSilent = async () => {
+    setIsSyncingLuogu(true);
+    setSyncStatusMsg("正在同步数据...");
+    setHologramState("loading");
+    try {
+      const res = await fetch(`${API_URL}/api/records/luogu/sync`, {
+        method: "POST"
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSyncStatusMsg("✅ 数据同步完成");
+        fetchDashboardData();
+        setHologramState("active");
+      } else {
+        setSyncStatusMsg(`❌ 自动同步失败: ${data.detail}`);
+        setHologramState("glitch");
+      }
+    } catch (err) {
+      setSyncStatusMsg("❌ 自动同步异常，网络连通失败");
+      setHologramState("glitch");
+    } finally {
+      setIsSyncingLuogu(false);
+      setTimeout(() => setSyncStatusMsg(""), 5000);
+    }
+  };
 
   // 一键加载所有控制台数据流
   const fetchDashboardData = async () => {
@@ -68,6 +99,14 @@ export default function App() {
       setStats(dataStats);
 
       setIsLoading(false);
+
+      // 首次加载成功且已配置 UID 时自动静默同步一次数据
+      if (!autoSyncedRef.current && dataSettings.luogu_uid) {
+        autoSyncedRef.current = true;
+        setTimeout(() => {
+          handleSyncDataSilent();
+        }, 200);
+      }
     } catch (err) {
       console.error("加载数据舱参数流失败:", err);
     }
@@ -84,7 +123,7 @@ export default function App() {
       return;
     }
     setIsSyncingLuogu(true);
-    setSyncStatusMsg("正在抓取洛谷数据...");
+    setSyncStatusMsg("正在同步数据...");
     setHologramState("loading");
 
     try {
@@ -117,7 +156,7 @@ export default function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-cyber-bg font-mono text-cyber-cyan scanlines">
         <div className="w-12 h-12 border-4 border-cyber-cyan border-t-transparent rounded-full animate-spin mb-4" />
-        <span className="animate-pulse tracking-widest text-sm">INITIALIZING MOSS-LITE SYSTEM...</span>
+        <span className="animate-pulse tracking-widest text-sm">{t('app.initializing')}</span>
       </div>
     );
   }
@@ -137,7 +176,7 @@ export default function App() {
           <Cpu className="w-6 h-6 text-cyber-cyan animate-pulse" />
           <div>
             <h1 className="font-orbitron font-black text-lg text-cyber-cyan tracking-widest cyber-text-glow">
-              MOSS-Lite
+              {t('app.title')}
             </h1>
           </div>
         </div>
@@ -151,16 +190,23 @@ export default function App() {
 
         {/* 当前人生状态状态显示 */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={toggleLang}
+            className="p-2 border border-cyber-blue/30 rounded bg-cyber-card/30 text-cyber-cyan hover:bg-cyber-cyan/10 hover:border-cyber-cyan transition-all font-bold"
+            title="Toggle Language"
+          >
+            {lang === 'zh' ? 'EN' : '中'}
+          </button>
           <div className="text-right font-mono text-xs">
-            <div className="text-gray-500">CURRENT LIFE MODE</div>
+            <div className="text-gray-500">{t('app.currentMode')}</div>
             <div className="text-cyber-cyan font-bold tracking-wider cyber-text-glow uppercase">
-              {activeModeObj?.display_name || "N/A"}
+              {activeModeObj?.display_name?.replace(/模式$/, "").replace(/\s*Mode$/i, "") || "N/A"}
             </div>
           </div>
           <button
             onClick={fetchDashboardData}
             className="p-2 border border-cyber-blue/30 rounded bg-cyber-card/30 text-cyber-cyan hover:bg-cyber-cyan/10 hover:border-cyber-cyan transition-all"
-            title="刷新数据流"
+            title={t('app.refresh')}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -182,31 +228,68 @@ export default function App() {
               <div className="cyber-panel p-5 rounded-lg cyber-border-glow font-mono text-xs text-cyber-text">
                 <h3 className="font-orbitron font-bold text-cyber-cyan mb-3 border-b border-cyber-blue/20 pb-2 tracking-wider text-xs flex items-center gap-1.5">
                   <BarChart2 className="w-4 h-4 text-cyber-cyan" />
-                  COGNITIVE CAPACITIES (30 DAYS)
+                  {t('app.cognitive')}
                 </h3>
                 
-                <div className="space-y-2.5">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">学习总累计:</span>
-                    <strong className="text-cyber-cyan">{stats.study_30days} min</strong>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">体育运动量:</span>
-                    <strong className="text-cyber-green">{stats.exercise_30days} min</strong>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">洛谷累计通过:</span>
-                    <strong className="text-cyber-pink">{stats.luogu_30days} 题</strong>
-                  </div>
-                  <div className="border-t border-cyber-blue/10 pt-2.5 flex justify-between items-center">
-                    <span className="text-gray-500">账单总支出:</span>
-                    <strong className="text-cyber-pink">￥{stats.expense_30days.toFixed(2)}</strong>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">账单总收入:</span>
-                    <strong className="text-cyber-green">￥{stats.income_30days.toFixed(2)}</strong>
-                  </div>
+                {/* 时间维度切换器 */}
+                <div className="flex gap-1 font-mono text-[10px] bg-cyber-bg/50 p-1 rounded border border-cyber-blue/10 mb-4 justify-between">
+                  {[
+                    { id: "total", label: t('stats.total') },
+                    { id: "yearly", label: t('stats.yearly') },
+                    { id: "monthly", label: t('stats.monthly') },
+                    { id: "weekly", label: t('stats.weekly') },
+                    { id: "daily", label: t('stats.daily') }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setCognitiveTimeRange(tab.id)}
+                      className={`px-1.5 py-0.5 rounded transition-all ${
+                        cognitiveTimeRange === tab.id 
+                          ? "bg-cyber-cyan/20 text-cyber-cyan font-bold shadow-[0_0_5px_rgba(102,252,241,0.2)]" 
+                          : "text-gray-500 hover:text-cyber-cyan/70"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
+
+                {(() => {
+                  const currentCognitiveData = stats.time_range_stats?.[cognitiveTimeRange] || {
+                    study_minutes: 0,
+                    exercise_minutes: 0,
+                    luogu_solved: 0,
+                    expense: 0.0,
+                    income: 0.0
+                  };
+                  return (
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">{t('app.studyTotal')}:</span>
+                        <strong className="text-cyber-cyan">{currentCognitiveData.study_minutes} min</strong>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">{t('app.exerciseTotal')}:</span>
+                        <strong className="text-cyber-green">{currentCognitiveData.exercise_minutes} min</strong>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">{t('app.luoguTotal')}:</span>
+                        <strong className="text-cyber-pink">
+                          {currentCognitiveData.luogu_solved} {lang === 'zh' ? '题' : ''}
+                        </strong>
+                      </div>
+                      <div className="border-t border-cyber-blue/10 pt-2.5 flex justify-between items-center">
+                        <span className="text-gray-500">{t('app.expenseTotal')}:</span>
+                        <strong className="text-cyber-pink">￥{currentCognitiveData.expense.toFixed(2)}</strong>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">{t('app.incomeTotal')}:</span>
+                        <strong className="text-cyber-green">￥{currentCognitiveData.income.toFixed(2)}</strong>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="mt-4 pt-3 border-t border-cyber-blue/20 flex gap-2">
                   <button
@@ -215,7 +298,7 @@ export default function App() {
                     className="w-full flex items-center justify-center gap-1.5 bg-cyber-pink/20 hover:bg-cyber-pink/30 border border-cyber-pink text-cyber-pink py-2 rounded font-orbitron font-bold tracking-widest transition-all disabled:opacity-40"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingLuogu ? "animate-spin" : ""}`} />
-                    SYNC LUOGU STATS
+                    {t('app.syncLuogu')}
                   </button>
                 </div>
               </div>
@@ -268,7 +351,7 @@ export default function App() {
 
       {/* 底部声明 */}
       <footer className="mt-12 text-center text-[11px] font-mono text-gray-700">
-        <p>MOSS-LITE // ALL LOCAL PROCEDURES STABILIZED // OPERATIONAL ENVIRONMENT: DEEP SPACE 9</p>
+        <p>{t('app.footer')}</p>
       </footer>
     </div>
   );

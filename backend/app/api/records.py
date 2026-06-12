@@ -174,42 +174,98 @@ def get_stats(db: Session = Depends(get_db)):
         if r.date >= start_year:
             stats_data["yearly"][cat] = stats_data["yearly"].get(cat, 0) + r.duration_minutes
 
+    # 计算各周期维度属性汇总数据 (总, 年, 月, 周, 日)
+    ranges = {
+        "total": None,
+        "yearly": start_year,
+        "monthly": start_month,
+        "weekly": start_week,
+        "daily": today
+    }
+    
+    time_range_stats = {}
+    for key, start_date in ranges.items():
+        # 1. 学习和运动累计时间 (分钟)
+        study_q = db.query(func.sum(StudyRecord.duration_minutes))
+        exercise_q = db.query(func.sum(StudyRecord.duration_minutes))
+        if start_date:
+            study_q = study_q.filter(StudyRecord.date >= start_date)
+            exercise_q = exercise_q.filter(StudyRecord.date >= start_date)
+        
+        study_mins = study_q.filter(StudyRecord.category != "exercise").scalar() or 0
+        exercise_mins = exercise_q.filter(StudyRecord.category == "exercise").scalar() or 0
+        
+        # 2. 财务收支总金额
+        expense_q = db.query(func.sum(FinancialRecord.amount)).filter(FinancialRecord.type == "expense")
+        income_q = db.query(func.sum(FinancialRecord.amount)).filter(FinancialRecord.type == "income")
+        if start_date:
+            expense_q = expense_q.filter(FinancialRecord.date >= start_date)
+            income_q = income_q.filter(FinancialRecord.date >= start_date)
+            
+        expense_val = expense_q.scalar() or 0.0
+        income_val = income_q.scalar() or 0.0
+        
+        # 3. 洛谷累计通过数
+        if key == "total":
+            system_setting = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
+            luogu_val = system_setting.luogu_total_solved if system_setting else 0
+        else:
+            luogu_q = db.query(func.sum(DailyMetric.luogu_solved_count))
+            if start_date:
+                luogu_q = luogu_q.filter(DailyMetric.date >= start_date)
+            
+            if key == "daily":
+                luogu_val = luogu_q.filter(DailyMetric.date == today).scalar() or 0
+            else:
+                luogu_val = luogu_q.scalar() or 0
+                
+        time_range_stats[key] = {
+            "study_minutes": int(study_mins),
+            "exercise_minutes": int(exercise_mins),
+            "luogu_solved": int(luogu_val),
+            "expense": round(float(expense_val), 2),
+            "income": round(float(income_val), 2)
+        }
+
     return {
         "study_30days": total_study,
         "exercise_30days": total_exercise,
         "income_30days": round(income_30, 2),
         "expense_30days": round(expense_30, 2),
         "luogu_30days": total_luogu,
-        "advanced_stats": stats_data
+        "advanced_stats": stats_data,
+        "time_range_stats": time_range_stats
     }
 
 @router.get("/records/heatmap")
 def get_heatmap_data(days: int = Query(60, ge=15, le=365), db: Session = Depends(get_db)):
     """
     获取近 N 天的热力图网格数据点。
-    返回每个日期的各维度具体数值与综合等级。
+    返回每个日期的各维度具体数值与综合等级，并附带洛谷难度总统计。
     """
     today = date.today()
     start_date = today - timedelta(days=days - 1)
     
     # 预加载此范围的所有数据，避免 N+1 查询
     study_records = db.query(StudyRecord).filter(StudyRecord.date >= start_date).all()
-    finance_records = db.query(FinancialRecord).filter(FinancialRecord.date >= start_date).all()
     daily_metrics = db.query(DailyMetric).filter(DailyMetric.date >= start_date).all()
     
     # 按日期进行聚合
     study_map = {}
     exercise_map = {}
+    coding_map = {}
+    
     for r in study_records:
+        cat = r.category or ""
+        # 只要分类名包含 '代码'、'刷题' 或 'coding' 关键字，都计入 coding 专注时长
+        is_coding = "coding" in cat.lower() or "代码" in cat or "刷题" in cat
+        
         if r.category == "exercise":
             exercise_map[r.date] = exercise_map.get(r.date, 0) + r.duration_minutes
+        elif is_coding:
+            coding_map[r.date] = coding_map.get(r.date, 0) + r.duration_minutes
         else:
             study_map[r.date] = study_map.get(r.date, 0) + r.duration_minutes
-            
-    expense_map = {}
-    for r in finance_records:
-        if r.type == "expense":
-            expense_map[r.date] = expense_map.get(r.date, 0.0) + r.amount
             
     metric_map = {m.date: m for m in daily_metrics}
     
@@ -233,20 +289,22 @@ def get_heatmap_data(days: int = Query(60, ge=15, le=365), db: Session = Depends
         metric = metric_map.get(current)
         study_min = study_map.get(current, 0)
         exercise_min = exercise_map.get(current, 0)
+        coding_min = coding_map.get(current, 0)
         luogu_solved = metric.luogu_solved_count if metric else 0
-        expense_val = expense_map.get(current, 0.0)
+        luogu_max_diff = metric.luogu_max_difficulty if metric else 0
         rating = metric.overall_rating if metric else "B"
         
-        # 计算综合活跃得分 (用于热力图原始深浅度表示)
-        combined_score = study_min + (exercise_min * 2) + (luogu_solved * 10)
+        # 计算综合活跃得分
+        combined_score = study_min + coding_min + (exercise_min * 2) + (luogu_solved * 10)
         
         points.append({
             "date": current.isoformat(),
             "is_future": False,
             "study_minutes": study_min,
             "exercise_minutes": exercise_min,
+            "coding_minutes": coding_min,
             "luogu_solved": luogu_solved,
-            "expense": round(expense_val, 2),
+            "luogu_max_difficulty": luogu_max_diff,
             "rating": rating,
             "combined_score": combined_score,
             "events": events_map.get(current, [])
@@ -261,15 +319,28 @@ def get_heatmap_data(days: int = Query(60, ge=15, le=365), db: Session = Depends
             "is_future": True,
             "study_minutes": 0,
             "exercise_minutes": 0,
+            "coding_minutes": 0,
             "luogu_solved": 0,
-            "expense": 0.0,
+            "luogu_max_difficulty": 0,
             "rating": "N/A",
             "combined_score": 0,
             "events": events_map.get(current, [])
         })
         current += timedelta(days=1)
         
-    return points
+    # 获取洛谷难度总统计数据
+    settings = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
+    difficulty_stats = {str(i): 0 for i in range(8)}
+    if settings and settings.luogu_difficulty_stats:
+        try:
+            difficulty_stats = json.loads(settings.luogu_difficulty_stats)
+        except Exception:
+            pass
+            
+    return {
+        "points": points,
+        "difficulty_stats": difficulty_stats
+    }
 
 # --- 未来事件 CRUD ---
 @router.get("/records/future_events", response_model=List[FutureEventResponse])
@@ -295,17 +366,11 @@ def delete_future_event(event_id: int, db: Session = Depends(get_db)):
 
 # --- 辅助评级函数 ---
 
-def recalculate_daily_rating(db: Session, target_date: date):
-    """
-    根据当天设定的生命模式目标，自动计算评级并更新数据库。
-    """
-    # 1. 查找系统当前设置的模式
-    settings = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
-    mode_name = settings.current_mode if settings else "cozy"
-    mode = db.query(LifeMode).filter(LifeMode.name == mode_name).first()
-    
+# --- 辅助评级函数 ---
+
+def _recalculate_rating_for_metric(db: Session, target_date: date, metric: DailyMetric, mode_name: str, mode: Optional[LifeMode]):
+    """核心自律评级计算逻辑"""
     if not mode:
-        # 如果模式不存在，默认使用全 0 规则 (无压力，直接给 B/A)
         target_study = 0
         target_exercise = 0
         target_luogu = 0
@@ -314,7 +379,7 @@ def recalculate_daily_rating(db: Session, target_date: date):
         target_exercise = mode.target_exercise_minutes
         target_luogu = mode.target_luogu_solved
 
-    # 2. 获取当天的实际数值
+    # 获取当天的实际数值
     study_min = db.query(func.sum(StudyRecord.duration_minutes)).filter(
         StudyRecord.date == target_date,
         StudyRecord.category != "exercise"
@@ -325,20 +390,13 @@ def recalculate_daily_rating(db: Session, target_date: date):
         StudyRecord.category == "exercise"
     ).scalar() or 0
     
-    metric = db.query(DailyMetric).filter(DailyMetric.date == target_date).first()
     luogu_solved = metric.luogu_solved_count if metric else 0
 
-    # 3. 计算完成率并核对评级
-    # 目标为 0 时自动视作 100% 完成
+    # 计算完成率并核对评级
     study_ok = study_min >= target_study if target_study > 0 else True
     exercise_ok = exercise_min >= target_exercise if target_exercise > 0 else True
     luogu_ok = luogu_solved >= target_luogu if target_luogu > 0 else True
 
-    # 简易评级规则：
-    # 全部达标 = A
-    # 任一未达标但平均完成度 > 50% = B
-    # 严重摆烂 / 没学习没运动 = C
-    # 如果今天是“休假模式 (holiday)”，只要支出没严重超支，自动拿 A 或 B
     if mode_name == "holiday":
         rating = "A" if exercise_min > 0 or study_min > 0 else "B"
     else:
@@ -349,35 +407,77 @@ def recalculate_daily_rating(db: Session, target_date: date):
         else:
             rating = "C"
 
-    # 4. 更新评级
+    metric.overall_rating = rating
+
+def recalculate_daily_rating(db: Session, target_date: date):
+    """根据当天设定的生命模式目标，自动计算评级并更新数据库。"""
+    settings = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
+    mode_name = settings.current_mode if settings else "cozy"
+    mode = db.query(LifeMode).filter(LifeMode.name == mode_name).first()
+    
+    metric = db.query(DailyMetric).filter(DailyMetric.date == target_date).first()
     if not metric:
-        metric = DailyMetric(date=target_date, overall_rating=rating)
+        metric = DailyMetric(date=target_date)
         db.add(metric)
-    else:
-        metric.overall_rating = rating
         
+    _recalculate_rating_for_metric(db, target_date, metric, mode_name, mode)
+    db.commit()
+
+def fill_historical_metrics(db: Session, daily_counts: dict):
+    """将爬取到的历史做题记录 (dailyCounts) 填入 database，覆盖或新增，并自动重算评级。"""
+    settings = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
+    mode_name = settings.current_mode if settings else "cozy"
+    mode = db.query(LifeMode).filter(LifeMode.name == mode_name).first()
+    
+    for date_str, val in daily_counts.items():
+        try:
+            target_date = date.fromisoformat(date_str)
+            solved_count, max_diff = val
+            
+            metric = db.query(DailyMetric).filter(DailyMetric.date == target_date).first()
+            if not metric:
+                metric = DailyMetric(
+                    date=target_date,
+                    luogu_solved_count=solved_count,
+                    luogu_max_difficulty=max_diff,
+                    overall_rating="B"
+                )
+                db.add(metric)
+            else:
+                metric.luogu_solved_count = solved_count
+                metric.luogu_max_difficulty = max_diff
+                
+            _recalculate_rating_for_metric(db, target_date, metric, mode_name, mode)
+        except Exception as e:
+            print(f"导入历史洛谷数据 {date_str} 失败: {e}")
     db.commit()
 
 # --- 洛谷抓取与同步 API ---
-from ..services.luogu_scraper import scrape_luogu_solved
+import json
+from ..services.luogu_scraper import scrape_luogu_user_profile
 
 @router.post("/records/luogu/sync")
 def sync_luogu(db: Session = Depends(get_db)):
-    """手动触发洛谷数据抓取，计算差额并存入数据库"""
+    """手动触发洛谷数据抓取，计算差额并存入数据库，回溯历史数据并统计各难度题数"""
     settings = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
     if not settings or not settings.luogu_uid:
         raise HTTPException(status_code=400, detail="未配置洛谷 UID，请前往配置")
         
     uid = settings.luogu_uid
     try:
-        current_solved = scrape_luogu_solved(uid)
+        res_data = scrape_luogu_user_profile(uid)
+        current_solved = res_data["passed_count"]
+        daily_counts = res_data["daily_counts"]
+        difficulty_stats = res_data["difficulty_stats"]
         
         # 第一次绑定或底数为零
         if settings.luogu_total_solved == 0:
             settings.luogu_total_solved = current_solved
+            settings.luogu_difficulty_stats = json.dumps(difficulty_stats)
             db.commit()
+            fill_historical_metrics(db, daily_counts)
             return {
-                "detail": "洛谷绑定成功！已初始化累计题数底数", 
+                "detail": "洛谷绑定成功！已初始化累计题数底数并导入历史做题记录", 
                 "current_solved": current_solved, 
                 "today_added": 0
             }
@@ -387,31 +487,44 @@ def sync_luogu(db: Session = Depends(get_db)):
         # 异常情况重置
         if today_added < 0:
             settings.luogu_total_solved = current_solved
+            settings.luogu_difficulty_stats = json.dumps(difficulty_stats)
             db.commit()
+            fill_historical_metrics(db, daily_counts)
             return {
-                "detail": "洛谷累计题数发生异常倒退，已重置底数", 
+                "detail": "洛谷累计题数发生异常倒退，已重置底数并更新历史", 
                 "current_solved": current_solved, 
                 "today_added": 0
             }
             
-        # 更新今天的过题数据
+        # 更新历史最近两三个月过题数据
+        fill_historical_metrics(db, daily_counts)
+        
+        # 针对今天进行单独设置 (防止 fill_historical_metrics 中有偏差)
         today = date.today()
+        today_str = today.isoformat()
+        if today_str in daily_counts:
+            today_count, today_max_diff = daily_counts[today_str]
+        else:
+            today_count = max(0, today_added)
+            today_max_diff = 0
+            
         metric = db.query(DailyMetric).filter(DailyMetric.date == today).first()
         if not metric:
-            metric = DailyMetric(date=today, luogu_solved_count=today_added)
+            metric = DailyMetric(date=today, luogu_solved_count=today_count, luogu_max_difficulty=today_max_diff)
             db.add(metric)
         else:
-            metric.luogu_solved_count = today_added  # 洛谷数据以今日累计最新相比最初的增量为主
+            metric.luogu_solved_count = today_count
+            metric.luogu_max_difficulty = today_max_diff
             
-        # 更新数据库中的历史累计数记录
         settings.luogu_total_solved = current_solved
+        settings.luogu_difficulty_stats = json.dumps(difficulty_stats)
         db.commit()
         
-        # 重新评估自律评级
+        # 重新评估今日评级
         recalculate_daily_rating(db, today)
         
         return {
-            "detail": f"洛谷同步成功！今日新增通过 {today_added} 题",
+            "detail": f"洛谷同步成功！今日新增通过 {today_added} 题，已同步历史做题记录",
             "current_solved": current_solved,
             "today_added": today_added
         }

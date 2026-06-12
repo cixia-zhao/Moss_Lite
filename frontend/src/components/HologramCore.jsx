@@ -209,7 +209,7 @@ export default function HologramCore({ state = "calm" }) {
       <canvas ref={canvasRef} className="w-[240px] h-[240px]" />
       <div className="mt-2 text-center">
         <span className="font-orbitron text-xs font-bold tracking-widest text-cyber-cyan cyber-text-glow">
-          MOSS-LITE CORE v1.0
+          LINK CORE v1.0
         </span>
       </div>
     </div>

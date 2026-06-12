@@ -14,6 +14,42 @@ from .services.ai_agent import get_client
 # 1. 数据库建表与初始化
 Base.metadata.create_all(bind=engine)
 
+def migrate_database():
+    """数据库平滑迁移：检查并自动向 system_settings 表和 daily_metrics 表中添加新字段"""
+    db = SessionLocal()
+    try:
+        conn = db.bind.raw_connection()
+        cursor = conn.cursor()
+        
+        # 1. 迁移 system_settings 表
+        cursor.execute("PRAGMA table_info(system_settings)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        if "deepseek_api_base" not in columns:
+            cursor.execute("ALTER TABLE system_settings ADD COLUMN deepseek_api_base VARCHAR(200) DEFAULT 'https://api.deepseek.com/v1'")
+            print("Successfully migrated system_settings: added deepseek_api_base")
+        if "deepseek_model" not in columns:
+            cursor.execute("ALTER TABLE system_settings ADD COLUMN deepseek_model VARCHAR(50) DEFAULT 'deepseek-chat'")
+            print("Successfully migrated system_settings: added deepseek_model")
+        if "luogu_difficulty_stats" not in columns:
+            cursor.execute("ALTER TABLE system_settings ADD COLUMN luogu_difficulty_stats TEXT")
+            print("Successfully migrated system_settings: added luogu_difficulty_stats")
+            
+        # 2. 迁移 daily_metrics 表
+        cursor.execute("PRAGMA table_info(daily_metrics)")
+        dm_columns = [row[1] for row in cursor.fetchall()]
+        if "luogu_max_difficulty" not in dm_columns:
+            cursor.execute("ALTER TABLE daily_metrics ADD COLUMN luogu_max_difficulty INTEGER DEFAULT 0")
+            print("Successfully migrated daily_metrics: added luogu_max_difficulty")
+        
+        conn.commit()
+    except Exception as e:
+        print(f"数据库迁移异常: {e}")
+    finally:
+        db.close()
+
+migrate_database()
+
 def seed_database():
     """预置内置核心生命模式"""
     db = SessionLocal()
@@ -84,7 +120,7 @@ def seed_database():
 seed_database()
 
 # 2. 创建 FastAPI 实例
-app = FastAPI(title="MOSS-Lite API Server", version="1.0.0")
+app = FastAPI(title="Link API Server", version="1.0.0")
 
 # 3. 设置 CORS 跨域 (便于 React 开发模式下调试)
 app.add_middleware(
@@ -152,14 +188,14 @@ def check_and_send_reminders():
             return  # 全达标，无需提醒
             
         # 推送通知
-        title = "🛰️ MOSS-Lite 飞船自律警报"
-        body = "主人，今天的部分自律指标还未达标哦，别忘了打卡喂养 MOSS 核心！"
+        title = "🛰️ Link 飞船自律警报"
+        body = "主人，今天的部分自律指标还未达标哦，别忘了打卡喂养 Link 核心！"
         
         if settings.deepseek_api_key:
             try:
                 client = get_client(settings.deepseek_api_key)
                 prompt = (
-                    f"作为主人的赛博自律飞船智脑 MOSS-Lite，为其推送一条极简且温和的催促提醒消息。\n"
+                    f"作为主人的赛博自律飞船智脑 Link，为其推送一条极简且温和的催促提醒消息。\n"
                     f"当前模式: {mode.display_name}。\n"
                     f"今日进度: 学习 {study_min}/{mode.target_study_minutes} 分钟, "
                     f"运动 {exercise_min}/{mode.target_exercise_minutes} 分钟, "
@@ -176,7 +212,7 @@ def check_and_send_reminders():
                 if ai_text:
                     body = ai_text
             except Exception as e:
-                print(f"MOSS 推送文本生成异常: {e}")
+                print(f"Link 推送文本生成异常: {e}")
                 
         # 执行通知推送
         send_notification(

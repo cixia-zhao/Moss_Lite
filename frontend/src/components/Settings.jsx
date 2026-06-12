@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { Settings as SettingsIcon, Sliders, Bell, User, Cpu, AlertTriangle, Plus, Trash } from "lucide-react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export default function Settings({ settings, modes, onSettingsUpdated, apiUrl }) {
+  const { t } = useLanguage();
   // 系统设置表单状态
   const [currentMode, setCurrentMode] = useState(settings.current_mode || "cozy");
   const [luoguUid, setLuoguUid] = useState(settings.luogu_uid || "");
   const [luoguTotalSolved, setLuoguTotalSolved] = useState(settings.luogu_total_solved || 0);
   const [deepseekKey, setDeepseekKey] = useState(settings.deepseek_api_key || "");
+  const [deepseekBase, setDeepseekBase] = useState(settings.deepseek_api_base || "https://api.deepseek.com/v1");
+  const [deepseekModel, setDeepseekModel] = useState(settings.deepseek_model || "deepseek-chat");
   const [pushDeerKey, setPushDeerKey] = useState(settings.push_deer_key || "");
   const [barkKey, setBarkKey] = useState(settings.bark_key || "");
   const [reminderTime, setReminderTime] = useState(settings.reminder_time || "22:00");
@@ -14,6 +18,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
   
   // 新建/编辑模式表单状态
   const [showModeModal, setShowModeModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, modeId: null, modeName: "" });
   const [modeName, setModeName] = useState("");
   const [modeDisplayName, setModeDisplayName] = useState("");
   const [modeDesc, setModeDesc] = useState("");
@@ -22,6 +27,8 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
   const [targetLuogu, setTargetLuogu] = useState(0);
   const [allowReminders, setAllowReminders] = useState(true);
   const [modeAiPrompt, setModeAiPrompt] = useState("");
+  const [isEditingMode, setIsEditingMode] = useState(false);
+  const [editingModeId, setEditingModeId] = useState(null);
   
   const [infoMsg, setInfoMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -36,6 +43,8 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
     setBarkKey(settings.bark_key || "");
     setReminderTime(settings.reminder_time || "22:00");
     setReminderEnabled(settings.reminder_enabled ?? true);
+    setDeepseekBase(settings.deepseek_api_base || "https://api.deepseek.com/v1");
+    setDeepseekModel(settings.deepseek_model || "deepseek-chat");
   }, [settings]);
 
   // 保存系统设置
@@ -52,7 +61,9 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
       push_deer_key: pushDeerKey || null,
       bark_key: barkKey || null,
       reminder_time: reminderTime,
-      reminder_enabled: reminderEnabled
+      reminder_enabled: reminderEnabled,
+      deepseek_api_base: deepseekBase || "https://api.deepseek.com/v1",
+      deepseek_model: deepseekModel || "deepseek-chat"
     };
 
     try {
@@ -72,18 +83,33 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
     }
   };
 
-  // 创建自定义生命模式
-  const handleCreateMode = async (e) => {
+  // 编辑生命模式
+  const handleEditMode = (modeObj) => {
+    setIsEditingMode(true);
+    setEditingModeId(modeObj.id);
+    setModeName(modeObj.name);
+    setModeDisplayName(modeObj.display_name);
+    setModeDesc(modeObj.description || "");
+    setTargetStudy(modeObj.target_study_minutes);
+    setTargetExercise(modeObj.target_exercise_minutes);
+    setTargetLuogu(modeObj.target_luogu_solved);
+    setAllowReminders(modeObj.allow_reminders);
+    setModeAiPrompt(modeObj.ai_system_prompt || "");
+    setErrorMsg("");
+    setShowModeModal(true);
+  };
+
+  // 创建或修改生命模式表单提交
+  const handleSubmitMode = async (e) => {
     e.preventDefault();
     setErrorMsg("");
 
-    if (!/^[a-z0-9_]+$/.test(modeName)) {
+    if (!isEditingMode && !/^[a-z0-9_]+$/.test(modeName)) {
       setErrorMsg("模式标识符必须由小写英文字母、数字或下划线组成");
       return;
     }
 
     const payload = {
-      name: modeName,
       display_name: modeDisplayName,
       description: modeDesc,
       target_study_minutes: parseInt(targetStudy) || 0,
@@ -93,14 +119,25 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
       ai_system_prompt: modeAiPrompt
     };
 
+    if (!isEditingMode) {
+      payload.name = modeName;
+    }
+
     try {
-      const res = await fetch(`${apiUrl}/api/modes`, {
-        method: "POST",
+      const url = isEditingMode 
+        ? `${apiUrl}/api/modes/${editingModeId}`
+        : `${apiUrl}/api/modes`;
+      const method = isEditingMode ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
         setShowModeModal(false);
+        setIsEditingMode(false);
+        setEditingModeId(null);
         setModeName("");
         setModeDisplayName("");
         setModeDesc("");
@@ -108,28 +145,37 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
         onSettingsUpdated(); // 重新加载模式列表
       } else {
         const errData = await res.json();
-        setErrorMsg(errData.detail || "创建模式失败，请确保标识符唯一");
+        setErrorMsg(errData.detail || (isEditingMode ? "修改模式失败，请确认参数是否合规" : "创建模式失败，请确保标识符唯一"));
       }
     } catch (err) {
-      setErrorMsg("创建模式失败，网络通讯异常");
+      setErrorMsg(isEditingMode ? "修改模式失败，网络通讯异常" : "创建模式失败，网络通讯异常");
     }
   };
 
-  // 删除自定义模式
-  const handleDeleteMode = async (id, name) => {
-    if (!confirm(`确认要删除自定义的模式【${name}】吗？`)) return;
+  // 触发删除自定义模式确认
+  const handleDeleteMode = (id, name) => {
+    setDeleteConfirm({ show: true, modeId: id, modeName: name });
+  };
+
+  // 执行真正的删除模式操作
+  const confirmDeleteMode = async () => {
+    const { modeId } = deleteConfirm;
+    if (!modeId) return;
     try {
-      const res = await fetch(`${apiUrl}/api/modes/${id}`, {
+      const res = await fetch(`${apiUrl}/api/modes/${modeId}`, {
         method: "DELETE"
       });
       if (res.ok) {
         onSettingsUpdated();
       } else {
         const errData = await res.json();
-        alert(errData.detail || "删除失败");
+        setErrorMsg(errData.detail || "删除失败");
       }
     } catch (err) {
       console.error("删除模式异常:", err);
+      setErrorMsg("删除失败，网络通讯异常");
+    } finally {
+      setDeleteConfirm({ show: false, modeId: null, modeName: "" });
     }
   };
 
@@ -138,7 +184,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
       <div className="flex items-center gap-2 border-b border-cyber-blue/20 pb-3 mb-4">
         <SettingsIcon className="w-4 h-4 text-cyber-cyan" />
         <h3 className="font-orbitron font-bold text-sm text-cyber-cyan tracking-widest">
-          SYSTEM SETTINGS & MODES
+          {t('settings.title')}
         </h3>
       </div>
 
@@ -161,28 +207,31 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
           <div className="bg-cyber-bg/40 border border-cyber-blue/10 p-3 rounded space-y-3">
             <h4 className="text-xs font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
               <Sliders className="w-3.5 h-3.5" />
-              LIFE ACCELERATOR MODE
+              {t('settings.lifeMode')}
             </h4>
             
             <div>
-              <label className="block text-gray-500 mb-1">当前人生时期 / 模式状态</label>
+              <label className="block text-gray-500 mb-1">{t('settings.currentPeriod')}</label>
               <select
                 value={currentMode}
                 onChange={(e) => setCurrentMode(e.target.value)}
                 className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan"
               >
-                {modes.map((m) => (
-                  <option key={m.id} value={m.name}>
-                    {m.display_name} ({m.target_study_minutes}m学 | {m.target_exercise_minutes}m运 | {m.target_luogu_solved}题)
-                  </option>
-                ))}
+                {modes.map((m) => {
+                  const cleanOptName = m.display_name?.replace(/模式$/, "").replace(/\s*Mode$/i, "");
+                  return (
+                    <option key={m.id} value={m.name}>
+                      {cleanOptName} ({m.target_study_minutes}m学 | {m.target_exercise_minutes}m运 | {m.target_luogu_solved}题)
+                    </option>
+                  );
+                })}
               </select>
-              <p className="text-xs text-gray-500 mt-1">切换模式将自适应更改自律标准、AI 管家语气及推送阈值</p>
+              <p className="text-xs text-gray-500 mt-1">{t('settings.modeHint')}</p>
             </div>
             
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-gray-500 mb-1">洛谷 UID</label>
+                <label className="block text-gray-500 mb-1">{t('settings.uid')}</label>
                 <input
                   type="text"
                   value={luoguUid}
@@ -192,12 +241,12 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 />
               </div>
               <div>
-                <label className="block text-gray-500 mb-1">已计洛谷累计数</label>
+                <label className="block text-gray-500 mb-1">{t('settings.solved')}</label>
                 <input
                   type="number"
                   value={luoguTotalSolved}
-                  onChange={(e) => setLuoguTotalSolved(e.target.value)}
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none cyber-input-focus"
+                  disabled
+                  className="w-full bg-cyber-bg/50 border border-cyber-blue/30 rounded px-2.5 py-1.5 text-gray-500 cursor-not-allowed outline-none"
                 />
               </div>
             </div>
@@ -206,10 +255,10 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
           <div className="bg-cyber-bg/40 border border-cyber-blue/10 p-3 rounded space-y-3">
             <h4 className="text-xs font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
               <Cpu className="w-3.5 h-3.5" />
-              INTELLIGENCE & AI API KEY
+              {t('settings.aiKey')}
             </h4>
             <div>
-              <label className="block text-gray-500 mb-1">DeepSeek API Key (主人心事记忆对话)</label>
+              <label className="block text-gray-500 mb-1">{t('settings.deepseek')}</label>
               <input
                 type="password"
                 value={deepseekKey}
@@ -217,7 +266,27 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 placeholder="sk-..."
                 className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
               />
-              <p className="text-[11px] text-gray-600 mt-1">本配置保存在本地 SQLite 中，仅用于本地 AI 对话和日记点评</p>
+              <p className="text-[11px] text-gray-600 mt-1">{t('settings.deepseekHint')}</p>
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1">API 接口地址 (Base URL)</label>
+              <input
+                type="text"
+                value={deepseekBase}
+                onChange={(e) => setDeepseekBase(e.target.value)}
+                placeholder="默认: https://api.deepseek.com/v1"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1">对话模型名称 (Model)</label>
+              <input
+                type="text"
+                value={deepseekModel}
+                onChange={(e) => setDeepseekModel(e.target.value)}
+                placeholder="默认: deepseek-chat"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-cyan outline-none focus:border-cyber-cyan cyber-input-focus"
+              />
             </div>
           </div>
         </div>
@@ -227,12 +296,12 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
           <div className="bg-cyber-bg/40 border border-cyber-blue/10 p-3 rounded space-y-3">
             <h4 className="text-xs font-bold text-cyber-cyan tracking-wider flex items-center gap-1">
               <Bell className="w-3.5 h-3.5" />
-              BARK / PUSHDEER PUSH CHANNELS
+              {t('settings.push')}
             </h4>
             
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-gray-500 mb-1">推送时间</label>
+                <label className="block text-gray-500 mb-1">{t('settings.pushTime')}</label>
                 <input
                   type="time"
                   value={reminderTime}
@@ -249,24 +318,24 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                     onChange={(e) => setReminderEnabled(e.target.checked)}
                     className="w-4 h-4 rounded border-gray-700 bg-cyber-bg text-cyber-cyan focus:ring-0"
                   />
-                  <span className="text-gray-400">开启每日推送</span>
+                  <span className="text-gray-400">{t('settings.dailyPush')}</span>
                 </label>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
               <div>
-                <label className="block text-gray-500 mb-1">iOS Bark Device Key (选填)</label>
+                <label className="block text-gray-500 mb-1">{t('settings.barkKey')}</label>
                 <input
                   type="text"
                   value={barkKey}
                   onChange={(e) => setBarkKey(e.target.value)}
-                  placeholder="请输入您的 Bark 密钥"
+                  placeholder={t('settings.barkKey')}
                   className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-text outline-none"
                 />
               </div>
               <div>
-                <label className="block text-gray-500 mb-1">微信 PushDeer PushKey (选填)</label>
+                <label className="block text-gray-500 mb-1">{t('settings.pushDeerKey')}</label>
                 <input
                   type="text"
                   value={pushDeerKey}
@@ -280,17 +349,10 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
 
           <div className="flex gap-2">
             <button
-              type="button"
-              onClick={() => setShowModeModal(true)}
-              className="flex-1 bg-cyber-pink/20 border border-cyber-pink text-cyber-pink py-2 rounded font-orbitron font-bold text-[11px] sm:text-xs tracking-wider transition-all cyber-glow-btn cyber-glow-btn-pink"
-            >
-              CREATE CUSTOM MODE
-            </button>
-            <button
               type="submit"
-              className="flex-1 bg-cyber-cyan/20 border border-cyber-cyan text-cyber-cyan py-2 rounded font-orbitron font-bold text-[11px] sm:text-xs tracking-wider transition-all cyber-glow-btn cyber-glow-btn-cyan"
+              className="w-full bg-cyber-cyan/20 border border-cyber-cyan text-cyber-cyan py-2 rounded font-orbitron font-bold text-[11px] sm:text-xs tracking-wider transition-all cyber-glow-btn cyber-glow-btn-cyan"
             >
-              SAVE CONFIGURATION
+              {t('settings.saveConfig')}
             </button>
           </div>
         </div>
@@ -298,20 +360,45 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
 
       {/* 自定义模式列表管理区 */}
       <div className="mt-5 pt-4 border-t border-cyber-blue/20">
-        <h4 className="font-orbitron font-bold text-xs text-cyber-cyan mb-3 tracking-wider">
-          LIFE MODES REGISTRY
-        </h4>
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="font-orbitron font-bold text-xs text-cyber-cyan tracking-wider">
+            {t('settings.registry')}
+          </h4>
+          <button
+            type="button"
+            onClick={() => {
+              setIsEditingMode(false);
+              setEditingModeId(null);
+              setModeName("");
+              setModeDisplayName("");
+              setModeDesc("");
+              setTargetStudy(60);
+              setTargetExercise(15);
+              setTargetLuogu(0);
+              setAllowReminders(true);
+              setModeAiPrompt("");
+              setErrorMsg("");
+              setShowModeModal(true);
+            }}
+            className="p-1 border border-cyber-cyan/30 rounded bg-cyber-card/30 text-cyber-cyan hover:bg-cyber-cyan/10 hover:border-cyber-cyan transition-all flex items-center justify-center"
+            title={t('settings.createCustom')}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {modes.map((m) => {
             const isBuiltin = ["cozy", "finals", "sprint", "holiday", "reading"].includes(m.name);
+            const cleanName = m.display_name.replace(/模式$/, "").replace(/\s*Mode$/i, "");
             return (
               <div 
                 key={m.id}
-                className="bg-cyber-card/30 border border-cyber-blue/10 p-2.5 rounded font-mono text-xs flex flex-col justify-between"
+                onClick={() => handleEditMode(m)}
+                className="bg-cyber-card/30 border border-cyber-blue/10 p-2.5 rounded font-mono text-xs flex flex-col justify-between cursor-pointer hover:border-cyber-cyan/40 hover:bg-cyber-card/50 transition-all"
               >
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="font-bold text-cyber-text">{m.display_name}</span>
+                    <span className="font-bold text-cyber-text">{cleanName}</span>
                     <span className="text-[10px] bg-cyber-blue/10 text-cyber-blue px-1 rounded">
                       {isBuiltin ? "SYSTEM" : "CUSTOM"}
                     </span>
@@ -325,7 +412,11 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                   </span>
                   {!isBuiltin && (
                     <button 
-                      onClick={() => handleDeleteMode(m.id, m.display_name)}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteMode(m.id, m.display_name);
+                      }}
                       className="text-gray-500 hover:text-cyber-pink p-0.5"
                       title="删除自定义模式"
                     >
@@ -339,53 +430,56 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
         </div>
       </div>
 
-      {/* 创建模式弹出框 Modal */}
+      {/* 创建/编辑生命模式弹出框 Modal */}
       {showModeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <form onSubmit={handleCreateMode} className="bg-cyber-card border border-cyber-cyan/30 rounded-lg p-5 w-full max-w-md font-mono text-xs text-cyber-text space-y-3">
+          <form onSubmit={handleSubmitMode} className="bg-cyber-card border border-cyber-cyan/30 rounded-lg p-5 w-full max-w-md font-mono text-xs text-cyber-text space-y-3">
             <h3 className="font-orbitron font-bold text-sm text-cyber-cyan mb-2 tracking-widest border-b border-cyber-blue/20 pb-2">
-              CREATE NEW LIFE MODE
+              {isEditingMode ? "编辑生命状态" : t('settings.createTitle')}
             </h3>
             
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-gray-500 mb-1">模式英文代号 (唯一)</label>
+                <label className="block text-gray-500 mb-1">{t('settings.modeId')}</label>
                 <input
                   type="text"
                   value={modeName}
                   onChange={(e) => setModeName(e.target.value)}
+                  disabled={isEditingMode}
                   placeholder="如: code_sprint"
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1 text-cyber-cyan outline-none"
+                  className={`w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1 text-cyber-cyan outline-none ${
+                    isEditingMode ? "opacity-50 cursor-not-allowed text-gray-500" : "cyber-input-focus"
+                  }`}
                   required
                 />
               </div>
               <div>
-                <label className="block text-gray-500 mb-1">模式展示名称</label>
+                <label className="block text-gray-500 mb-1">{t('settings.modeName')}</label>
                 <input
                   type="text"
                   value={modeDisplayName}
                   onChange={(e) => setModeDisplayName(e.target.value)}
                   placeholder="如: 代码狂飙模式"
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1 text-cyber-cyan outline-none"
+                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1 text-cyber-cyan outline-none cyber-input-focus"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-gray-500 mb-1">描述说明</label>
+              <label className="block text-gray-500 mb-1">{t('settings.desc')}</label>
               <input
                 type="text"
                 value={modeDesc}
                 onChange={(e) => setModeDesc(e.target.value)}
                 placeholder="简述该时期的生活重点"
-                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1 text-cyber-text outline-none"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2 py-1 text-cyber-text outline-none cyber-input-focus"
               />
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-gray-500 mb-1">目标学习(分钟)</label>
+                <label className="block text-gray-500 mb-1">{t('settings.targetStudy')}</label>
                 <input
                   type="number"
                   value={targetStudy}
@@ -395,7 +489,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 />
               </div>
               <div>
-                <label className="block text-gray-500 mb-1">目标运动(分钟)</label>
+                <label className="block text-gray-500 mb-1">{t('settings.targetExercise')}</label>
                 <input
                   type="number"
                   value={targetExercise}
@@ -405,7 +499,7 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 />
               </div>
               <div>
-                <label className="block text-gray-500 mb-1">目标过题(题)</label>
+                <label className="block text-gray-500 mb-1">{t('settings.targetLuogu')}</label>
                 <input
                   type="number"
                   value={targetLuogu}
@@ -423,17 +517,17 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 onChange={(e) => setAllowReminders(e.target.checked)}
                 className="w-3.5 h-3.5"
               />
-              <label className="text-gray-400">在此模式下允许微信/手机催促提醒</label>
+              <label className="text-gray-400">{t('settings.allowPush')}</label>
             </div>
 
             <div>
-              <label className="block text-gray-500 mb-1">MOSS 智脑语气指导提示词</label>
+              <label className="block text-gray-500 mb-1">{t('settings.aiPrompt')}</label>
               <textarea
                 value={modeAiPrompt}
                 onChange={(e) => setModeAiPrompt(e.target.value)}
                 placeholder="例如: 用极为冷酷但包含期待的教官语气说话。对洛谷过题数极其严苛。"
                 rows="3"
-                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-text outline-none"
+                className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 text-cyber-text outline-none focus:border-cyber-cyan"
               />
             </div>
 
@@ -443,16 +537,46 @@ export default function Settings({ settings, modes, onSettingsUpdated, apiUrl })
                 onClick={() => setShowModeModal(false)}
                 className="flex-1 border border-gray-600 hover:bg-gray-800 text-gray-400 py-1.5 rounded"
               >
-                CANCEL
+                {t('settings.cancel')}
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-cyber-pink/20 border border-cyber-pink text-cyber-pink hover:bg-cyber-pink/30 py-1.5 rounded"
+                className="flex-1 bg-cyber-pink/20 border border-cyber-pink text-cyber-pink hover:bg-cyber-pink/30 py-1.5 rounded transition-all font-bold"
               >
-                CREATE MODE
+                {isEditingMode ? "保存修改" : t('settings.create')}
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* 内置的自定义删除生命模式确认弹窗 */}
+      {deleteConfirm.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-cyber-card border border-cyber-pink/40 rounded-lg p-5 w-full max-w-sm font-mono text-xs text-cyber-text space-y-4 shadow-[0_0_15px_rgba(236,72,153,0.15)] cyber-glow-pink">
+            <h3 className="font-orbitron font-bold text-sm text-cyber-pink mb-2 tracking-widest border-b border-cyber-pink/20 pb-2">
+              ⚠️ 确认擦除
+            </h3>
+            <p className="text-gray-300 leading-relaxed">
+              您确定要删除自定义的生命模式 <span className="text-cyber-pink font-bold">【{deleteConfirm.modeName}】</span> 吗？此操作将永远抹除该模式定义。
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm({ show: false, modeId: null, modeName: "" })}
+                className="flex-1 border border-gray-600 hover:bg-gray-800 text-gray-400 py-1.5 rounded"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteMode}
+                className="flex-1 bg-cyber-pink/20 border border-cyber-pink text-cyber-pink hover:bg-cyber-pink/30 py-1.5 rounded transition-all font-bold"
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

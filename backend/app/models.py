@@ -46,6 +46,7 @@ class DailyMetric(Base):
     height = Column(Float, nullable=True)                              # 身高 (cm)
     bmi = Column(Float, nullable=True)                                 # 体重指数 BMI
     luogu_solved_count = Column(Integer, default=0)                    # 当天洛谷过题数
+    luogu_max_difficulty = Column(Integer, default=0)                  # 当天洛谷最高难度
     overall_rating = Column(String(5), default="B")                    # 综合评级 (A, B, C, D)
     user_mood = Column(String(20), nullable=True)                      # 心情心情 (happy, tired, anxious, relaxed)
     ai_diary_review = Column(Text, nullable=True)                      # 智脑每日点评日志
@@ -68,11 +69,23 @@ class SystemSetting(Base):
     current_mode = Column(String(50), default="cozy")                  # 当前所处模式
     luogu_uid = Column(String(50), nullable=True)                      # 洛谷 UID
     luogu_total_solved = Column(Integer, default=0)                    # 洛谷上一次记录的累计过题数
+    luogu_difficulty_stats = Column(Text, nullable=True)               # 洛谷难度分布统计 JSON 字符串
     deepseek_api_key = Column(String(100), nullable=True)              # DeepSeek API Key
     push_deer_key = Column(String(100), nullable=True)                # PushDeer 推送 Key
     bark_key = Column(String(100), nullable=True)                      # Bark 推送 Key
     reminder_time = Column(String(10), default="22:00")                # 每日推送提醒时间
     reminder_enabled = Column(Boolean, default=True)                   # 是否开启推送
+    deepseek_api_base = Column(String(200), default="https://api.deepseek.com/v1")  # API 基地址
+    deepseek_model = Column(String(50), default="deepseek-chat")       # 对话模型名称
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sender = Column(String(20), nullable=False)                        # "user" 或 "link"
+    text = Column(Text, nullable=False)                                # 消息内容
+    timestamp = Column(DateTime, default=datetime.now)                 # 发送时间
+    state = Column(String(20), nullable=True)                          # AI 状态球波形样式
 
 class FutureEvent(Base):
     __tablename__ = "future_events"

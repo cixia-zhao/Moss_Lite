@@ -8,7 +8,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_DIR = os.path.join(os.path.dirname(BASE_DIR), "database")
 os.makedirs(DB_DIR, exist_ok=True)
 
-DATABASE_URL = f"sqlite:///{os.path.join(DB_DIR, 'moss_lite.db')}"
+DATABASE_URL = f"sqlite:///{os.path.join(DB_DIR, 'link.db')}"
 
 engine = create_engine(
     DATABASE_URL, 

@@ -29,13 +29,15 @@ def update_settings(payload: SystemSettings, db: Session = Depends(get_db)):
     settings.current_mode = payload.current_mode
     settings.luogu_uid = payload.luogu_uid
     settings.luogu_total_solved = payload.luogu_total_solved
+    settings.luogu_difficulty_stats = payload.luogu_difficulty_stats
     settings.deepseek_api_key = payload.deepseek_api_key
     settings.push_deer_key = payload.push_deer_key
     settings.bark_key = payload.bark_key
     settings.reminder_time = payload.reminder_time
     settings.reminder_enabled = payload.reminder_enabled
+    settings.deepseek_api_base = payload.deepseek_api_base
+    settings.deepseek_model = payload.deepseek_model
 
-    
     db.commit()
     db.refresh(settings)
     return settings

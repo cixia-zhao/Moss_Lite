@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { DollarSign, Upload, Trash2, ArrowUpRight, ArrowDownRight, AlertCircle, FileText, CheckCircle } from "lucide-react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export default function Ledger({ records, onRecordAdded, apiUrl }) {
+  const { t } = useLanguage();
   const [type, setType] = useState("expense"); // "expense" 或 "income"
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("餐饮");
@@ -120,7 +122,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
       <div className="flex items-center gap-2 border-b border-cyber-blue/20 pb-3 mb-4">
         <DollarSign className="w-4 h-4 text-cyber-cyan" />
         <h3 className="font-orbitron font-bold text-sm text-cyber-cyan tracking-widest">
-          LEDGER & BILL INTERFACE
+          {t('ledger.title')}
         </h3>
       </div>
 
@@ -154,7 +156,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                     : "border-gray-800 text-gray-500 hover:text-cyber-blue"
                 }`}
               >
-                支出 (EXPENSE)
+                {t('ledger.expense')}
               </button>
               <button
                 type="button"
@@ -165,13 +167,13 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                     : "border-gray-800 text-gray-500 hover:text-cyber-blue"
                 }`}
               >
-                收入 (INCOME)
+                {t('ledger.income')}
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-gray-500 mb-1">流水金额(元)</label>
+                <label className="block text-gray-500 mb-1">{t('ledger.amount')}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -183,7 +185,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                 />
               </div>
               <div>
-                <label className="block text-gray-500 mb-1">账单分类</label>
+                <label className="block text-gray-500 mb-1">{t('ledger.category')}</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
@@ -198,7 +200,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-gray-500 mb-1">发生日期</label>
+                <label className="block text-gray-500 mb-1">{t('ledger.date')}</label>
                 <input
                   type="date"
                   value={billDate}
@@ -208,7 +210,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
                 />
               </div>
               <div>
-                <label className="block text-gray-500 mb-1">说明备注</label>
+                <label className="block text-gray-500 mb-1">{t('ledger.desc')}</label>
                 <input
                   type="text"
                   value={desc}
@@ -223,7 +225,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
               type="submit"
               className="w-full bg-cyber-blue/20 border border-cyber-blue text-cyber-cyan py-2 rounded font-orbitron font-bold tracking-widest transition-all cyber-glow-btn cyber-glow-btn-cyan"
             >
-              SAVE MANUAL RECORD
+              {t('ledger.save')}
             </button>
           </form>
 
@@ -239,13 +241,13 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
             {isUploading ? (
               <div className="flex flex-col items-center justify-center py-2">
                 <div className="w-5 h-5 border-2 border-cyber-cyan border-t-transparent rounded-full animate-spin mb-2" />
-                <span className="text-cyber-cyan font-bold animate-pulse">PARSING CSV BILL DATA...</span>
+                <span className="text-cyber-cyan font-bold animate-pulse">{t('ledger.parsing')}</span>
               </div>
             ) : (
               <div className="flex flex-col items-center py-2">
                 <Upload className="w-6 h-6 text-cyber-cyan/70 mb-1.5" />
-                <span className="font-bold text-cyber-cyan">微信 / 支付宝账单 CSV 导入</span>
-                <span className="text-xs text-gray-500 mt-1">拖拽或点击上传 CSV 文件进行智能分类解析</span>
+                <span className="font-bold text-cyber-cyan">{t('ledger.uploadTitle')}</span>
+                <span className="text-xs text-gray-500 mt-1">{t('ledger.uploadDesc')}</span>
               </div>
             )}
           </div>
@@ -254,7 +256,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
         {/* 右半边：流水列表 */}
         <div className="flex flex-col h-[270px] border border-cyber-blue/20 bg-cyber-bg/40 p-3 rounded">
           <div className="text-xs font-bold text-cyber-cyan mb-2 border-b border-cyber-blue/20 pb-1.5 tracking-wider">
-            RECENT LEDGER STREAM (LATEST 15)
+            {t('ledger.recent')}
           </div>
           
           <div className="flex-1 overflow-y-auto pr-1 space-y-1.5">
@@ -294,7 +296,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-600 font-mono">
                 <FileText className="w-8 h-8 mb-1 opacity-40" />
-                <span>舱室内暂无账单数据流</span>
+                <span>{t('ledger.empty')}</span>
               </div>
             )}
           </div>

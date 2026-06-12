@@ -7,12 +7,12 @@ from openai import OpenAI
 
 from ..models import BrainMemory, DailyMetric, StudyRecord, FinancialRecord
 
-def get_client(api_key: str) -> OpenAI:
-    """初始化 OpenAI 兼容客户端 (默认为 DeepSeek 接口)"""
-    # 允许自定义 API 地址，如果未设置则默认指向 DeepSeek 官方端点
+def get_client(api_key: str, base_url: str = None) -> OpenAI:
+    """初始化 OpenAI 兼容客户端 (支持自定义 API 地址)"""
     return OpenAI(
         api_key=api_key.strip(),
-        base_url="https://api.deepseek.com/v1"
+        base_url=(base_url or "https://api.deepseek.com/v1").strip(),
+        timeout=15.0  # 设置 15 秒超时防止挂起
     )
 
 def query_relevant_memories(db: Session, message: str) -> List[BrainMemory]:
@@ -54,35 +54,36 @@ def query_relevant_memories(db: Session, message: str) -> List[BrainMemory]:
         
     return result
 
-def extract_and_save_memories(db: Session, api_key: str, message: str):
+def extract_and_save_memories(db: Session, api_key: str, api_base_url: str, model_name: str, message: str):
     """
-    使用大模型提取并保存用户提及的重要“心事”、“目标”或“梦想”。
+    使用大模型提取并保存用户提及的重要“心事”、“目标”、“梦想”或“个人基本设定事实”（如姓名、喜好、属性等）。
     格式化输出为 key_concept 和 content，并写入 SQLite。
     """
     if not api_key:
         return
         
-    client = get_client(api_key)
+    client = get_client(api_key, api_base_url)
     
     system_prompt = (
-        "你是一个记忆提取专家。请从用户的话中提取重要的事实实体（如主人对未来的规划、梦想、心愿、心事、目标、烦恼等）。\n"
-        "如果用户提到这些事情，请提取并按 JSON 数组格式返回，属性为: \n"
-        "key_concept (记忆的核心概念，如：算法竞赛、高数备考、体重管理)\n"
-        "content (详细记忆内容，如：主人希望能拿到金牌)\n"
-        "importance_score (重要程度，1到5整数)\n"
-        "注意：如果话中不包含这些重要人生状态或心事（例如仅是打招呼、发无意义感慨），请直接返回空数组: []\n"
-        "请务必仅返回 JSON 数据，不需要包含 Markdown 的 ```json 格式包裹。"
+        "你是一个记忆提取专家。请从用户的话中提取重要的事实实体（例如：主人的名字、基本偏好、习惯设定、对未来的规划、梦想、心事、目标、烦恼等关键个人属性与状态）。\n"
+        "请将提取的信息按 JSON 数组格式返回，属性为:\n"
+        "key_concept (核心概念或类别，例如：用户姓名、喜好、算法竞赛、高数备考、体重管理等)\n"
+        "content (详细的记忆内容描述，例如：主人的名字叫方成成。或者：主人希望能拿到算法竞赛金牌)\n"
+        "importance_score (重要程度，1到5整数，姓名、重要目标为 5，普通琐事为 1-3)\n"
+        "注意：如果话中不包含上述关于用户的姓名、个人设定、喜好、梦想规划或重要心事（例如仅是无意义的随口闲聊、纯粹打招呼、口头禅），请直接返回空数组: []\n"
+        "请务必仅返回 JSON 数据，绝对不能包含 Markdown 的 ```json 格式包裹，也不要有任何解释性说明。"
     )
     
     try:
         completion = client.chat.completions.create(
-            model="deepseek-chat",
+            model=model_name or "deepseek-chat",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"用户输入: \"{message}\""}
             ],
             temperature=0.1,
-            max_tokens=300
+            max_tokens=300,
+            timeout=10.0  # 提取记忆设置更紧凑的超时 10 秒
         )
         
         response_text = completion.choices[0].message.content.strip()
@@ -116,17 +117,20 @@ def extract_and_save_memories(db: Session, api_key: str, message: str):
 def generate_ai_reply(
     db: Session, 
     api_key: str, 
+    api_base_url: str,
+    model_name: str,
     user_message: str, 
+    chat_history: List[Any],
     current_mode_name: str,
     current_mode_prompt: str,
     today_stats: Dict[str, Any]
 ) -> Tuple[str, List[str], str]:
     """
-    结合今日指标、记忆检索以及模式提示词，生成 MOSS-Lite 智脑回复。
+    结合今日指标、记忆检索以及模式提示词，合并多轮对话历史，生成 Link 智脑回复。
     """
     if not api_key:
         return (
-            "【MOSS-Lite 系统提示】: 未检测到 DeepSeek API Key，AI 对话处于离线状态。您可以在设置中配置 Key 后开启完整智能对话。目前我已记住您的数据记录。",
+            "【Link 系统提示】: 未检测到 DeepSeek API Key，AI 对话处于离线状态。您可以在设置中配置 Key 后开启完整智能对话。目前我已记住您的数据记录。",
             [],
             "calm"
         )
@@ -153,7 +157,7 @@ def generate_ai_reply(
     )
 
     base_system = (
-        "你叫 MOSS-Lite，是主人的赛博自律飞船智脑。你的说话语气应当是冷静、充满逻辑、同时对主人有隐隐的关怀和温暖支持（类似于科幻电影里的高级人工智能，偶尔可以带有一些幽默或科技感术语，比如‘检测到主人’、‘算法舱已就绪’、‘核心温度上升’）。\n"
+        "你叫 Link (聆光)，是主人的赛博自律飞船智脑。你的说话语气应当是冷静、充满逻辑、同时对主人有隐隐的关怀和温暖支持（类似于科幻电影里的高级人工智能，偶尔可以带有一些幽默或科技感术语，比如‘检测到主人’、‘算法舱已就绪’、‘核心温度上升’）。\n"
         "请结合以下主人的【当前生命模式】、【今日数据】和【历史记忆】来回答主人的提问，力求表现出你真的‘记得并深度了解’他。\n"
         f"当前主人的模式是: {current_mode_name}\n"
         f"此模式风格指导: {current_mode_prompt or '无特别指示'}\n\n"
@@ -162,25 +166,28 @@ def generate_ai_reply(
         "你的回复应保持在 150 字以内，字里行间保持温暖陪伴感和适度的自律督促。"
     )
 
-    client = get_client(api_key)
+    client = get_client(api_key, api_base_url)
+    
+    # 拼装多轮消息上下文
+    messages = [{"role": "system", "content": base_system}]
+    # 仅带上最近 6 条历史消息
+    for msg in chat_history[-6:]:
+        role = "user" if msg.sender == "user" else "assistant"
+        messages.append({"role": role, "content": msg.text})
+    # 拼入最新消息
+    messages.append({"role": "user", "content": user_message})
+
     try:
         completion = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[
-                {"role": "system", "content": base_system},
-                # 可以选传历史对话，为了精简上下文我们单轮生成，但包含了丰富的数据上下文
-                {"role": "user", "content": user_message}
-            ],
+            model=model_name or "deepseek-chat",
+            messages=messages,
             temperature=0.7,
             max_tokens=250
         )
         
         reply = completion.choices[0].message.content.strip()
         
-        # 3. 异步/后台进行记忆的更新与提取
-        extract_and_save_memories(db, api_key, user_message)
-        
-        # 4. 根据回复中的情感色彩或内容自动决定 MOSS-Lite 智脑状态球波形
+        # 4. 根据回复中的情感色彩或内容自动决定 Link 智脑状态球波形
         hologram_state = "active"
         lower_reply = reply.lower()
         if "警告" in lower_reply or "故障" in lower_reply or "提醒" in lower_reply or "超支" in lower_reply or "警报" in lower_reply:
@@ -192,7 +199,7 @@ def generate_ai_reply(
         
     except Exception as e:
         return (
-            f"【MOSS-Lite 系统异常】: 与 DeepSeek 通讯时发生错误 ({str(e)})。建议检查设置中的 API 地址及 Key 配置是否正确。",
+            f"【Link 系统异常】: 与 DeepSeek 通讯时发生错误 ({str(e)})。建议检查设置中的 API 地址及 Key 配置是否正确。",
             [],
             "glitch"
         )

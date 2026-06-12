@@ -3,16 +3,22 @@ import re
 import urllib.parse
 import json
 from bs4 import BeautifulSoup
+import urllib3
 
-def scrape_luogu_solved(uid: str) -> int:
+# 禁用未校验 HTTPS 警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def scrape_luogu_user_profile(uid: str) -> dict:
     """
-    抓取洛谷用户的通过题目数量。
-    洛谷的统计数据通常包含在 script 标签的 window._feInjection 全局变量中。
+    抓取洛谷用户的做题相关数据，包括：
+    - passed_count: 累计通过题目数
+    - daily_counts: 最近约 90 天的历史每日过题数与最高难度，格式为 {"YYYY-MM-DD": [过题数, 最高难度]}
+    - difficulty_stats: 每个难度等级（0至7）的过题数量分布，格式为 {"0": count, "1": count, ...}
     """
     if not uid or not uid.strip().isdigit():
         raise ValueError("无效的洛谷 UID")
 
-    url = f"https://www.luogu.com.cn/user/{uid.strip()}"
+    uid = uid.strip()
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -22,50 +28,90 @@ def scrape_luogu_solved(uid: str) -> int:
         "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2",
     }
 
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            raise Exception(f"洛谷服务器返回错误代码: {response.status_code}")
-        
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        # 查找包含全局注入数据的 script 标签
-        script_tag = soup.find("script", string=re.compile("window\\._feInjection"))
-        if script_tag:
-            script_content = script_tag.string
-            # 提取 decodeURIComponent("...") 部分
-            match = re.search(r'decodeURIComponent\("([^"]+)"\)', script_content)
-            if match:
-                encoded_json = match.group(1)
-                decoded_json = urllib.parse.unquote(encoded_json)
-                data = json.loads(decoded_json)
-                
-                # 数据路径通常是 data['currentData']['user']['passedProblemCount']
-                try:
-                    passed_count = data['currentData']['user']['passedProblemCount']
-                    return int(passed_count)
-                except KeyError:
-                    pass
-        
-        # 备用方案：如果在 JSON 中找不到，尝试正则表达式直接匹配网页文本
-        match_solved = re.search(r'"passedProblemCount":\s*(\d+)', response.text)
-        if match_solved:
-            return int(match_solved.group(1))
+    # 优先采用用户本机的穿透代理（针对 SSLEOFError）
+    proxies = {
+        "http": "http://127.0.0.1:7897",
+        "https": "http://127.0.0.1:7897"
+    }
 
-        # 再次尝试匹配 HTML 中的文本（如果结构变了）
-        # 洛谷页面上可能会有类似 "通过无难度的题目: xxx" 或 "通过" 相关的文本
-        raise Exception("无法解析洛谷过题数，网页结构可能已发生变化")
-        
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"网络请求失败: {str(e)}")
+    # 1. 抓取主页，用于提取过题数 (passedProblemCount) 与 历史做题趋势 (dailyCounts)
+    main_url = f"https://www.luogu.com.cn/user/{uid}"
+    response = None
+    try:
+        response = requests.get(main_url, headers=headers, proxies=proxies, verify=False, timeout=10)
+    except Exception:
+        # 自动 fallback 进无代理直连
+        try:
+            response = requests.get(main_url, headers=headers, verify=False, timeout=10)
+        except Exception as e:
+            raise Exception(f"请求洛谷主页失败: {e}")
+
+    if not response or response.status_code != 200:
+        raise Exception(f"请求洛谷主页失败，状态码: {response.status_code if response else '未知'}")
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    script = soup.find("script", id="lentille-context")
+    
+    if not script:
+        raise Exception("无法解析洛谷主页，未找到 lentille-context 数据结构")
+
+    try:
+        main_data = json.loads(script.string or "{}")
     except Exception as e:
-        raise Exception(f"数据解析失败: {str(e)}")
+        raise Exception(f"解析个人主页 JSON 失败: {e}")
 
-# 测试验证代码
-if __name__ == "__main__":
-    # 使用洛谷官方或知名用户的 UID 进行本地调试 (如: 122461 或其他)
+    user_info = main_data.get("data", {}).get("user", {})
+    passed_count = user_info.get("passedProblemCount", 0)
+    daily_counts = main_data.get("data", {}).get("dailyCounts", {})
+
+    # 2. 抓取练习页，用于统计各难度通过数
+    practice_url = f"https://www.luogu.com.cn/user/{uid}/practice"
+    p_response = None
     try:
-        count = scrape_luogu_solved("1000")
-        print(f"UID 1000 成功抓取通过题目数: {count}")
+        p_response = requests.get(practice_url, headers=headers, proxies=proxies, verify=False, timeout=10)
+    except Exception:
+        try:
+            p_response = requests.get(practice_url, headers=headers, verify=False, timeout=10)
+        except Exception as e:
+            raise Exception(f"请求练习页面失败: {e}")
+
+    if not p_response or p_response.status_code != 200:
+        raise Exception(f"请求练习页面失败，状态码: {p_response.status_code if p_response else '未知'}")
+
+    p_soup = BeautifulSoup(p_response.text, "html.parser")
+    p_script = p_soup.find("script", id="lentille-context")
+    difficulty_stats = {str(i): 0 for i in range(8)}
+
+    if p_script:
+        try:
+            p_data = json.loads(p_script.string or "{}")
+            passed_list = p_data.get("data", {}).get("passed", [])
+            for item in passed_list:
+                diff = item.get("difficulty", 0)
+                diff_str = str(diff)
+                difficulty_stats[diff_str] = difficulty_stats.get(diff_str, 0) + 1
+        except Exception as e:
+            # 即使练习页解析异常，不中断主体，打日志即可
+            print(f"解析练习页面失败，跳过难度统计: {e}")
+
+    return {
+        "passed_count": passed_count,
+        "daily_counts": daily_counts,
+        "difficulty_stats": difficulty_stats
+    }
+
+def scrape_luogu_solved(uid: str) -> int:
+    """
+    抓取洛谷用户的通过题目数量 (兼容老接口)。
+    """
+    profile = scrape_luogu_user_profile(uid)
+    return profile["passed_count"]
+
+if __name__ == "__main__":
+    try:
+        data = scrape_luogu_user_profile("2110485")
+        print(f"已通过题数: {data['passed_count']}")
+        print(f"最近做题趋势天数: {len(data['daily_counts'])}")
+        print(f"各难度题数: {data['difficulty_stats']}")
     except Exception as ex:
         print(f"抓取测试出错: {ex}")
