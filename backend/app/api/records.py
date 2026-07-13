@@ -372,6 +372,21 @@ def delete_future_event(event_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"detail": "事件已删除"}
 
+@router.put("/records/future_events/{event_id}", response_model=FutureEventResponse)
+def update_future_event(event_id: int, payload: FutureEventCreate, db: Session = Depends(get_db)):
+    record = db.query(FutureEvent).filter(FutureEvent.id == event_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="事件不存在")
+    
+    update_data = payload.model_dump()
+    for key, value in update_data.items():
+        setattr(record, key, value)
+        
+    db.commit()
+    db.refresh(record)
+    return record
+
+
 # --- 辅助评级函数 ---
 
 # --- 辅助评级函数 ---

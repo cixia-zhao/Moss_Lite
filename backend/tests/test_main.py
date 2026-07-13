@@ -372,3 +372,121 @@ def test_chat_edit_delete():
     history = client.get("/api/chat/history").json()
     assert len(history) == 0
 
+def test_future_event_crud_endpoints():
+    # 1. 初始状态获取未来事件列表，确认是一个列表
+    response = client.get("/api/records/future_events")
+    assert response.status_code == 200
+    initial_events = response.json()
+    assert isinstance(initial_events, list)
+
+    # 2. 创建一个未来事件
+    from datetime import date, timedelta
+    future_date = (date.today() + timedelta(days=5)).isoformat()
+    payload = {
+        "date": future_date,
+        "title": "测试未来考试",
+        "description": "这是一次测试未来事件的备注说明"
+    }
+    response = client.post("/api/records/future_events", json=payload)
+    assert response.status_code == 200
+    created_data = response.json()
+    assert created_data["title"] == "测试未来考试"
+    assert created_data["description"] == "这是一次测试未来事件的备注说明"
+    assert created_data["date"] == future_date
+    event_id = created_data["id"]
+
+    # 3. 验证该事件已出现在列表中
+    response = client.get("/api/records/future_events")
+    assert response.status_code == 200
+    events = response.json()
+    assert any(ev["id"] == event_id for ev in events)
+
+    # 4. 测试编辑更新该事件
+    update_payload = {
+        "date": future_date,
+        "title": "更新后的未来测试考试",
+        "description": "更新后的备注说明信息"
+    }
+    response = client.put(f"/api/records/future_events/{event_id}", json=update_payload)
+    assert response.status_code == 200
+    updated_data = response.json()
+    assert updated_data["title"] == "更新后的未来测试考试"
+    assert updated_data["description"] == "更新后的备注说明信息"
+
+    # 5. 验证列表中数据已被修改
+    response = client.get("/api/records/future_events")
+    assert response.status_code == 200
+    events = response.json()
+    updated_ev = next((ev for ev in events if ev["id"] == event_id), None)
+    assert updated_ev is not None
+    assert updated_ev["title"] == "更新后的未来测试考试"
+    assert updated_ev["description"] == "更新后的备注说明信息"
+
+    # 6. 删除该事件
+    response = client.delete(f"/api/records/future_events/{event_id}")
+    assert response.status_code == 200
+    assert response.json()["detail"] == "事件已删除"
+
+    # 7. 再次检索验证已被删除
+    response = client.get("/api/records/future_events")
+    assert response.status_code == 200
+    assert not any(ev["id"] == event_id for ev in response.json())
+
+
+def test_generate_ai_reply_context_injection():
+    from datetime import date, timedelta
+    from app.models import FutureEvent
+    from app.services.ai_agent import generate_ai_reply
+
+    db = TestingSessionLocal()
+    # 1. 清理并插入一条 5 天后的未来日程里程碑
+    db.query(FutureEvent).delete()
+    future_date = date.today() + timedelta(days=5)
+    ev = FutureEvent(date=future_date, title="期末大考", description="冲刺满分")
+    db.add(ev)
+    db.commit()
+    db.close()
+
+    # 2. 模拟大模型回复，拦截 OpenAI create 请求以捕获 system prompt
+    with patch("app.services.ai_agent.OpenAI") as mock_openai_cls:
+        mock_client = mock_openai_cls.return_value
+        mock_completion = mock_client.chat.completions.create.return_value
+        mock_completion.choices = [
+            type("Choice", (), {"message": type("Message", (), {"content": "检测到您的期末大考。"})()})()
+        ]
+        
+        db_session = TestingSessionLocal()
+        today_stats = {
+            "today_study_by_category": {},
+            "today_luogu": 0,
+            "today_expense": 0.0,
+            "today_income": 0.0,
+            "today_weight": None,
+            "today_bmi": None
+        }
+        
+        # 调用 generate_ai_reply 触发上下文拼装
+        reply, memories_used, hologram_state = generate_ai_reply(
+            db=db_session,
+            api_key="fake-key",
+            api_base_url="https://fake.api.com",
+            model_name="fake-model",
+            user_message="你好",
+            chat_history=[],
+            current_mode_name="日常模式",
+            current_mode_prompt="保持警惕",
+            today_stats=today_stats
+        )
+        
+        # 3. 验证传入 mock 客户端的 system prompt 确实包含 "期末大考"
+        called_args, called_kwargs = mock_client.chat.completions.create.call_args
+        messages = called_kwargs.get("messages", [])
+        system_content = next((m["content"] for m in messages if m["role"] == "system"), "")
+        
+        assert "期末大考" in system_content
+        assert "5天" in system_content or "5 天" in system_content
+        
+        db_session.close()
+
+
+

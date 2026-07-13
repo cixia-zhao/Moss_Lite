@@ -1,50 +1,236 @@
 import React, { useState } from "react";
-import { Calendar, HelpCircle, Plus, AlertCircle } from "lucide-react";
+import { Calendar, HelpCircle, Plus, AlertCircle, Edit, Trash2 } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
+
+function isValidDate(y, m, d) {
+  const year = parseInt(y, 10);
+  const month = parseInt(m, 10);
+  const day = parseInt(d, 10);
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+
+  const monthLength = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  if (year % 400 === 0 || (year % 100 !== 0 && year % 4 === 0)) {
+    monthLength[1] = 29;
+  }
+
+  return day <= monthLength[month - 1];
+}
 
 export default function Heatmap({ data, onRefresh, apiUrl }) {
   const { t } = useLanguage();
   const [dimension, setDimension] = useState("combined"); // "combined", "luogu", "study", "exercise"
   const [hoveredCell, setHoveredCell] = useState(null);
   
-  // 未来事件表单 Modal
-  const [showEventModal, setShowEventModal] = useState(false);
+  // 未来事件管理 Modal 状态
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [futureEvents, setFutureEvents] = useState([]);
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [isEditingEvent, setIsEditingEvent] = useState(false);
+  const [editingEventId, setEditingEventId] = useState(null);
   const [eventDate, setEventDate] = useState("");
+  const [dateYear, setDateYear] = useState("");
+  const [dateMonth, setDateMonth] = useState("");
+  const [dateDay, setDateDay] = useState("");
   const [eventTitle, setEventTitle] = useState("");
   const [eventDesc, setEventDesc] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // 同步拆分日期到三个文本框中
+  React.useEffect(() => {
+    if (eventDate && eventDate.includes("-")) {
+      const parts = eventDate.split("-");
+      setDateYear(parts[0] || "");
+      setDateMonth(parts[1] || "");
+      setDateDay(parts[2] || "");
+    } else {
+      setDateYear("");
+      setDateMonth("");
+      setDateDay("");
+    }
+  }, [eventDate]);
+
 
   // 兼容老版本的数组格式与新版本对象格式
   const points = Array.isArray(data) ? data : (data?.points || []);
   const difficultyStats = Array.isArray(data) ? { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 } : (data?.difficulty_stats || { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 });
 
-  const handleCreateEvent = async (e) => {
+  const fetchFutureEvents = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/records/future_events`);
+      if (res.ok) {
+        const data = await res.json();
+        setFutureEvents(data);
+      }
+    } catch (err) {
+      console.error("获取未来事件失败:", err);
+    }
+  };
+
+  const handleYearChange = (e) => {
+    const val = e.target.value.replace(/\D/g, "");
+    setDateYear(val);
+    if (val.length === 4) {
+      document.getElementById("event-date-month")?.focus();
+    }
+  };
+
+  const handleMonthChange = (e) => {
+    let val = e.target.value.replace(/\D/g, "");
+    if (val !== "") {
+      const num = parseInt(val, 10);
+      if (num > 12) {
+        val = "12";
+      }
+      if (val.length === 1 && num > 1) {
+        val = "0" + val;
+      }
+    }
+    setDateMonth(val);
+    if (val.length === 2) {
+      document.getElementById("event-date-day")?.focus();
+    }
+  };
+
+  const handleMonthBlur = () => {
+    if (dateMonth && dateMonth.length === 1) {
+      setDateMonth(dateMonth.padStart(2, "0"));
+    }
+  };
+
+  const handleDayChange = (e) => {
+    let val = e.target.value.replace(/\D/g, "");
+    if (val !== "") {
+      const num = parseInt(val, 10);
+      if (num > 31) {
+        val = "31";
+      }
+      if (val.length === 1 && num > 3) {
+        val = "0" + val;
+      }
+    }
+    setDateDay(val);
+  };
+
+  const handleDayBlur = () => {
+    if (dateDay && dateDay.length === 1) {
+      setDateDay(dateDay.padStart(2, "0"));
+    }
+  };
+
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
+
+    const year = dateYear.trim();
+    const month = dateMonth.trim().padStart(2, "0");
+    const day = dateDay.trim().padStart(2, "0");
+
+    if (year.length !== 4 || dateMonth.trim().length === 0 || dateDay.trim().length === 0) {
+      setErrorMsg("请输入有效的年月日日期");
+      return;
+    }
+
+    if (!isValidDate(year, month, day)) {
+      setErrorMsg("请输入有效的公历日期（注意大小月及闰年）");
+      return;
+    }
+
+    const payload = {
+      date: `${year}-${month}-${day}`,
+      title: eventTitle,
+      description: eventDesc || null
+    };
+
     try {
-      const res = await fetch(`${apiUrl}/api/records/future_events`, {
-        method: "POST",
+      const url = isEditingEvent 
+        ? `${apiUrl}/api/records/future_events/${editingEventId}`
+        : `${apiUrl}/api/records/future_events`;
+      const method = isEditingEvent ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: eventDate,
-          title: eventTitle,
-          description: eventDesc
-        })
+        body: JSON.stringify(payload)
       });
+
       if (res.ok) {
-        setShowEventModal(false);
+        setShowEventForm(false);
+        setIsEditingEvent(false);
+        setEditingEventId(null);
         setEventDate("");
         setEventTitle("");
         setEventDesc("");
+        fetchFutureEvents();
         onRefresh();
       } else {
         const data = await res.json();
-        setErrorMsg(data.detail || "添加失败");
+        setErrorMsg(data.detail || "操作失败");
+      }
+    } catch (err) {
+      setErrorMsg("网络异常，请稍后重试");
+    }
+  };
+
+  const handleEditClick = (ev) => {
+    setIsEditingEvent(true);
+    setEditingEventId(ev.id);
+    setEventDate(ev.date);
+    setEventTitle(ev.title);
+    setEventDesc(ev.description || "");
+    setShowEventForm(true);
+  };
+
+  const handleDeleteClick = async (eventId) => {
+    try {
+      const res = await fetch(`${apiUrl}/api/records/future_events/${eventId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchFutureEvents();
+        onRefresh();
+      } else {
+        setErrorMsg("删除失败");
       }
     } catch (err) {
       setErrorMsg("网络异常");
     }
   };
+
+  const handleCellClick = (cell) => {
+    if (cell.is_future || (cell.events && cell.events.length > 0)) {
+      setEventDate(cell.date);
+      fetchFutureEvents();
+      setShowManageModal(true);
+      if (!cell.events || cell.events.length === 0) {
+        setShowEventForm(true);
+        setIsEditingEvent(false);
+        setEditingEventId(null);
+        setEventTitle("");
+        setEventDesc("");
+      } else {
+        setShowEventForm(false);
+        setIsEditingEvent(false);
+        setEditingEventId(null);
+      }
+    }
+  };
+
+  const handleOpenManager = () => {
+    fetchFutureEvents();
+    setShowManageModal(true);
+    setShowEventForm(false);
+    setIsEditingEvent(false);
+    setEditingEventId(null);
+    setEventDate("");
+    setEventTitle("");
+    setEventDesc("");
+    setErrorMsg("");
+  };
+
 
   const getColorClass = (cell) => {
     // 处理未来事件格子
@@ -125,6 +311,7 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
           key={cell.date}
           onMouseEnter={(e) => setHoveredCell({ ...cell, x: e.clientX, y: e.clientY })}
           onMouseLeave={() => setHoveredCell(null)}
+          onClick={() => handleCellClick(cell)}
           className={`w-3.5 h-3.5 rounded-sm border cursor-crosshair transition-all duration-150 hover:scale-125 hover:z-10 ${getColorClass(cell)}`}
         />
       );
@@ -216,7 +403,7 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
             {t('heatmap.title')}
           </h3>
           <button 
-            onClick={() => setShowEventModal(true)}
+            onClick={handleOpenManager}
             className="ml-2 flex items-center gap-1 px-2 py-0.5 border border-amber-500/50 text-amber-500 hover:bg-amber-500/20 text-[10px] font-mono rounded"
           >
             + {t('heatmap.addEvent')}
@@ -400,35 +587,187 @@ export default function Heatmap({ data, onRefresh, apiUrl }) {
         </div>
       )}
 
-      {/* 创建未来日程 Modal */}
-      {showEventModal && (
+      {/* 未来日程管理舱 Modal */}
+      {showManageModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <form onSubmit={handleCreateEvent} className="bg-cyber-card border border-amber-500/50 rounded-lg p-5 w-full max-w-sm font-mono text-xs text-cyber-text space-y-3">
-            <h3 className="font-orbitron font-bold text-sm text-amber-500 mb-2 tracking-widest border-b border-amber-500/20 pb-2">
-              {t('heatmap.addMilestone')}
-            </h3>
+          <div className="bg-cyber-card border border-cyber-blue/30 rounded-lg p-5 w-full max-w-lg font-mono text-xs text-cyber-text space-y-4 shadow-[0_0_15px_rgba(0,186,255,0.15)] flex flex-col max-h-[85vh]">
+            {/* 头部 */}
+            <div className="flex justify-between items-center border-b border-cyber-blue/20 pb-2 flex-shrink-0">
+              <h3 className="font-orbitron font-bold text-sm text-cyber-cyan tracking-widest flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-cyber-cyan" />
+                未来日程管理舱
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowManageModal(false);
+                  setIsEditingEvent(false);
+                  setEventDate("");
+                  setEventTitle("");
+                  setEventDesc("");
+                  setErrorMsg("");
+                }}
+                className="text-gray-500 hover:text-cyber-cyan text-base font-bold px-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 错误提示 */}
             {errorMsg && (
-              <div className="flex items-center gap-1.5 p-2 bg-red-900/40 border border-red-500/50 text-red-400 rounded">
+              <div className="flex items-center gap-1.5 p-2 bg-red-900/40 border border-red-500/50 text-red-400 rounded flex-shrink-0">
                 <AlertCircle className="w-3.5 h-3.5" /> {errorMsg}
               </div>
             )}
-            <div>
-              <label className="block text-amber-500/70 mb-1">{t('heatmap.targetDate')}</label>
-              <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required className="w-full bg-cyber-bg border border-amber-500/30 rounded px-2 py-1.5 outline-none text-amber-500 focus:border-amber-500" />
+
+            {/* 表单区域：用于新增或修改 */}
+            {(showEventForm || isEditingEvent) ? (
+              <form onSubmit={handleFormSubmit} className="bg-cyber-bg/50 border border-cyber-blue/10 p-4 rounded space-y-3 flex-shrink-0">
+                <h4 className="text-cyber-cyan font-bold mb-2 tracking-wider">
+                  {isEditingEvent ? "✏️ 修改里程碑" : "✨ 新增未来里程碑"}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-gray-500 mb-1">{t('heatmap.targetDate')}</label>
+                    <div className="flex items-center bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 focus-within:border-cyber-cyan gap-1">
+                      <input
+                        id="event-date-year"
+                        type="text"
+                        maxLength={4}
+                        value={dateYear}
+                        onChange={handleYearChange}
+                        placeholder="YYYY"
+                        required
+                        className="w-10 bg-transparent text-center text-cyber-cyan outline-none font-mono"
+                      />
+                      <span className="text-gray-600 font-mono">/</span>
+                      <input
+                        id="event-date-month"
+                        type="text"
+                        maxLength={2}
+                        value={dateMonth}
+                        onChange={handleMonthChange}
+                        onBlur={handleMonthBlur}
+                        placeholder="MM"
+                        required
+                        className="w-6 bg-transparent text-center text-cyber-cyan outline-none font-mono"
+                      />
+                      <span className="text-gray-600 font-mono">/</span>
+                      <input
+                        id="event-date-day"
+                        type="text"
+                        maxLength={2}
+                        value={dateDay}
+                        onChange={handleDayChange}
+                        onBlur={handleDayBlur}
+                        placeholder="DD"
+                        required
+                        className="w-6 bg-transparent text-center text-cyber-cyan outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-gray-500 mb-1">{t('heatmap.eventName')}</label>
+                    <input 
+                      type="text" 
+                      value={eventTitle} 
+                      onChange={e => setEventTitle(e.target.value)} 
+                      required 
+                      placeholder="如 六级考试, 期末备考" 
+                      className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 outline-none text-cyber-cyan focus:border-cyber-cyan" 
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-gray-500 mb-1">{t('heatmap.eventDesc')}</label>
+                  <input 
+                    type="text" 
+                    value={eventDesc} 
+                    onChange={e => setEventDesc(e.target.value)} 
+                    placeholder="详细目标或备注" 
+                    className="w-full bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 outline-none text-cyber-cyan focus:border-cyber-cyan" 
+                  />
+                </div>
+                <div className="flex gap-2 pt-1.5">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setShowEventForm(false);
+                      setIsEditingEvent(false);
+                      setEditingEventId(null);
+                      setEventDate("");
+                      setEventTitle("");
+                      setEventDesc("");
+                    }} 
+                    className="flex-1 border border-gray-600 text-gray-400 py-1.5 rounded hover:bg-gray-800"
+                  >
+                    {t('settings.cancel')}
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 bg-cyber-cyan/20 border border-cyber-cyan text-cyber-cyan py-1.5 rounded hover:bg-cyber-cyan/30 font-bold"
+                  >
+                    {isEditingEvent ? "保存修改" : t('heatmap.addEventBtn')}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowEventForm(true)}
+                className="w-full py-2 bg-cyber-cyan/10 border border-dashed border-cyber-cyan/40 hover:bg-cyber-cyan/20 text-cyber-cyan rounded flex items-center justify-center gap-1.5 font-bold flex-shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                建立新里程碑计划
+              </button>
+            )}
+
+            {/* 列表区域：展示所有的未来日程 */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-[200px]">
+              {futureEvents.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  未来空空如也，快去定下一个目标吧 🚀
+                </div>
+              ) : (
+                futureEvents.map(ev => (
+                  <div key={ev.id} className="bg-cyber-bg/40 border border-cyber-blue/10 hover:border-cyber-cyan/30 p-3 rounded flex justify-between items-start transition-all gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 rounded font-mono font-bold">
+                          📅 {ev.date}
+                        </span>
+                        <span className="text-gray-500 font-mono scale-90 origin-left">
+                          ({t('heatmap.countdown', { days: getDaysDiff(ev.date) })})
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-cyber-text text-sm leading-snug">{ev.title}</h4>
+                      {ev.description && (
+                        <p className="text-[11px] text-gray-400/80 leading-relaxed font-mono pl-0.5">{ev.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleEditClick(ev)}
+                        className="text-gray-500 hover:text-cyber-cyan p-1 transition-all"
+                        title="编辑"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteClick(ev.id)}
+                        className="text-gray-500 hover:text-cyber-pink p-1 transition-all"
+                        title="删除"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-            <div>
-              <label className="block text-amber-500/70 mb-1">{t('heatmap.eventName')}</label>
-              <input type="text" value={eventTitle} onChange={e => setEventTitle(e.target.value)} required className="w-full bg-cyber-bg border border-amber-500/30 rounded px-2 py-1.5 outline-none text-amber-500 focus:border-amber-500" />
-            </div>
-            <div>
-              <label className="block text-amber-500/70 mb-1">{t('heatmap.eventDesc')}</label>
-              <input type="text" value={eventDesc} onChange={e => setEventDesc(e.target.value)} className="w-full bg-cyber-bg border border-amber-500/30 rounded px-2 py-1.5 outline-none text-amber-500 focus:border-amber-500" />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 border border-gray-600 text-gray-400 py-1.5 rounded hover:bg-gray-800">{t('settings.cancel')}</button>
-              <button type="submit" className="flex-1 bg-amber-500/20 border border-amber-500 text-amber-500 py-1.5 rounded hover:bg-amber-500/30">{t('heatmap.addEventBtn')}</button>
-            </div>
-          </form>
+          </div>
         </div>
       )}
     </div>

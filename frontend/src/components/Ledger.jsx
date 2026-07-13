@@ -2,6 +2,24 @@ import React, { useState, useEffect } from "react";
 import { DollarSign, Upload, Trash2, ArrowUpRight, ArrowDownRight, AlertCircle, FileText, CheckCircle } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 
+function isValidDate(y, m, d) {
+  const year = parseInt(y, 10);
+  const month = parseInt(m, 10);
+  const day = parseInt(d, 10);
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+
+  const monthLength = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  if (year % 400 === 0 || (year % 100 !== 0 && year % 4 === 0)) {
+    monthLength[1] = 29;
+  }
+
+  return day <= monthLength[month - 1];
+}
+
 export default function Ledger({ records, onRecordAdded, apiUrl }) {
   const { t } = useLanguage();
   const [type, setType] = useState("expense"); // "expense" 或 "income"
@@ -9,9 +27,77 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
   const [category, setCategory] = useState("餐饮");
   const [desc, setDesc] = useState("");
   const [billDate, setBillDate] = useState(new Date().toISOString().split("T")[0]);
+  const [dateYear, setDateYear] = useState("");
+  const [dateMonth, setDateMonth] = useState("");
+  const [dateDay, setDateDay] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // 同步拆分日期到三个文本框中
+  useEffect(() => {
+    if (billDate && billDate.includes("-")) {
+      const parts = billDate.split("-");
+      setDateYear(parts[0] || "");
+      setDateMonth(parts[1] || "");
+      setDateDay(parts[2] || "");
+    } else {
+      setDateYear("");
+      setDateMonth("");
+      setDateDay("");
+    }
+  }, [billDate]);
+
+  const handleYearChange = (e) => {
+    const val = e.target.value.replace(/\D/g, "");
+    setDateYear(val);
+    if (val.length === 4) {
+      document.getElementById("bill-date-month")?.focus();
+    }
+  };
+
+  const handleMonthChange = (e) => {
+    let val = e.target.value.replace(/\D/g, "");
+    if (val !== "") {
+      const num = parseInt(val, 10);
+      if (num > 12) {
+        val = "12";
+      }
+      if (val.length === 1 && num > 1) {
+        val = "0" + val;
+      }
+    }
+    setDateMonth(val);
+    if (val.length === 2) {
+      document.getElementById("bill-date-day")?.focus();
+    }
+  };
+
+  const handleMonthBlur = () => {
+    if (dateMonth && dateMonth.length === 1) {
+      setDateMonth(dateMonth.padStart(2, "0"));
+    }
+  };
+
+  const handleDayChange = (e) => {
+    let val = e.target.value.replace(/\D/g, "");
+    if (val !== "") {
+      const num = parseInt(val, 10);
+      if (num > 31) {
+        val = "31";
+      }
+      if (val.length === 1 && num > 3) {
+        val = "0" + val;
+      }
+    }
+    setDateDay(val);
+  };
+
+  const handleDayBlur = () => {
+    if (dateDay && dateDay.length === 1) {
+      setDateDay(dateDay.padStart(2, "0"));
+    }
+  };
 
   // 当收支类型变化时，自动调整分类列表的默认值
   useEffect(() => {
@@ -30,6 +116,21 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
     e.preventDefault();
     setErrorMsg("");
 
+    const year = dateYear.trim();
+    const month = dateMonth.trim().padStart(2, "0");
+    const day = dateDay.trim().padStart(2, "0");
+    const formattedDate = `${year}-${month}-${day}`;
+
+    if (year.length !== 4 || dateMonth.trim().length === 0 || dateDay.trim().length === 0) {
+      setErrorMsg("请输入有效的年月日日期");
+      return;
+    }
+
+    if (!isValidDate(year, month, day)) {
+      setErrorMsg("请输入有效的公历日期（注意大小月及闰年）");
+      return;
+    }
+
     if (!amount || parseFloat(amount) <= 0) {
       setErrorMsg("金额必须大于 0");
       return;
@@ -40,7 +141,7 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
       amount: parseFloat(amount),
       category,
       description: desc || (type === "expense" ? "日常支出" : "日常收入"),
-      date: billDate,
+      date: formattedDate,
       source: "manual"
     };
 
@@ -201,13 +302,42 @@ export default function Ledger({ records, onRecordAdded, apiUrl }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-gray-500 mb-1">{t('ledger.date')}</label>
-                <input
-                  type="date"
-                  value={billDate}
-                  onChange={(e) => setBillDate(e.target.value)}
-                  className="w-full bg-cyber-bg border border-cyber-blue/30 rounded pl-2 pr-1 py-1.5 text-cyber-cyan outline-none cyber-input-focus"
-                  required
-                />
+                <div className="flex items-center bg-cyber-bg border border-cyber-blue/30 rounded px-2.5 py-1.5 focus-within:border-cyber-cyan gap-1">
+                  <input
+                    id="bill-date-year"
+                    type="text"
+                    maxLength={4}
+                    value={dateYear}
+                    onChange={handleYearChange}
+                    placeholder="YYYY"
+                    required
+                    className="w-10 bg-transparent text-center text-cyber-cyan outline-none font-mono"
+                  />
+                  <span className="text-gray-600 font-mono">/</span>
+                  <input
+                    id="bill-date-month"
+                    type="text"
+                    maxLength={2}
+                    value={dateMonth}
+                    onChange={handleMonthChange}
+                    onBlur={handleMonthBlur}
+                    placeholder="MM"
+                    required
+                    className="w-6 bg-transparent text-center text-cyber-cyan outline-none font-mono"
+                  />
+                  <span className="text-gray-600 font-mono">/</span>
+                  <input
+                    id="bill-date-day"
+                    type="text"
+                    maxLength={2}
+                    value={dateDay}
+                    onChange={handleDayChange}
+                    onBlur={handleDayBlur}
+                    placeholder="DD"
+                    required
+                    className="w-6 bg-transparent text-center text-cyber-cyan outline-none font-mono"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-gray-500 mb-1">{t('ledger.desc')}</label>

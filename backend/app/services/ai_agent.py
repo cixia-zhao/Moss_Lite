@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, Any
 from sqlalchemy.orm import Session
 from openai import OpenAI
 
-from ..models import BrainMemory, DailyMetric, StudyRecord, FinancialRecord
+from ..models import BrainMemory, DailyMetric, StudyRecord, FinancialRecord, FutureEvent
 
 def get_client(api_key: str, base_url: str = None) -> OpenAI:
     """初始化 OpenAI 兼容客户端 (支持自定义 API 地址)"""
@@ -185,6 +185,17 @@ def generate_ai_reply(
         f"  - 总累计 (Total): 学习 {today_stats.get('total_study', 0)} 分钟 / 运动 {today_stats.get('total_exercise', 0)} 分钟 / 洛谷 {today_stats.get('total_luogu', 0)} 题\n"
     )
 
+    # 3. 获取所有未过期的未来日程里程碑
+    today = datetime.now().date()
+    future_events = db.query(FutureEvent).filter(FutureEvent.date >= today).order_by(FutureEvent.date.asc()).all()
+    future_events_text = ""
+    if future_events:
+        future_events_text = "【主人未来日程里程碑】:\n"
+        for ev in future_events:
+            days_left = (ev.date - today).days
+            desc = f" ({ev.description})" if ev.description else ""
+            future_events_text += f"  - {ev.date} (倒计时: {days_left} 天) | {ev.title}{desc}\n"
+
     base_system = (
         "你叫 Link (聆光)，是主人的赛博自律飞船智脑。你的说话语气应当是冷静、充满逻辑、同时对主人有隐隐的关怀和温暖支持（类似于科幻电影里的高级人工智能，偶尔可以带有一些幽默或科技感术语，比如‘检测到主人’、‘算法舱已就绪’、‘核心温度上升’）。\n"
         "请结合以下主人的【当前生命模式】、【今日/本周/中长期数据】和【全部核心记忆】来回答主人的提问，力求表现出你真的‘记得并深度了解’他。\n"
@@ -192,6 +203,7 @@ def generate_ai_reply(
         f"当前主人的模式是: {current_mode_name}\n"
         f"此模式风格指导: {current_mode_prompt or '无特别指示'}\n\n"
         f"{stats_text}\n"
+        f"{future_events_text}\n"
         f"{memories_text}\n"
         "注意：传入的上下文包含历史聊天记录。你必须特别区分并针对带有‘【主人的最新提问/指令】’前缀的最后一条最新输入进行回复，之前的历史消息仅用作参考语境。\n"
         "你的回复应保持在 150 字以内，字里行间保持温暖陪伴感和适度的自律督促。"
